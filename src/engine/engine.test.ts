@@ -272,4 +272,5 @@ test('releaseImpact pools small previous builds into one baseline', () => {
   const series = [{ n: 1 }, { n: 9 }, { n: 2 }, { n: 7 }]
   assert.deepEqual(displaySeries(series), [{ n: 9 }, { n: 7 }])
   assert.deepEqual(displaySeries([{ n: 1 }, { n: 2 }]), [{ n: 1 }, { n: 2 }])
+  assert.deepEqual(displaySeries([{ n: 1 }, { n: 398 }]), [{ n: 398 }])
 })

@@ -2,7 +2,7 @@
 
 App Store review intelligence for indie iOS developers. Paste any App Store link and see the rating for every version, what changed after each release, and what people are complaining about.
 
-**Live:** https://review-radar.vercel.app
+**Live:** https://review-radar-xi.vercel.app
 
 ## The pain
 

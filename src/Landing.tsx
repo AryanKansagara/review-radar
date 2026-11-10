@@ -97,6 +97,7 @@ function HeroRadar() {
 
       <div className={`radar-body${busy ? ' dim' : ''}`}>
         <Timeline series={series} impact={impact} selected={active} onSelect={setSel} height={230} compact />
+        {series.length === 1 && <p className="muted small center">Almost every recent review is on version {series[0].version}. Release impact needs reviews on two versions: open it as a project to fetch every country and keep history across updates.</p>}
         <div className="radar-split">
           <div className="radar-stats">
             {point && <>
@@ -167,7 +168,7 @@ export function Landing() {
           <article className="tile"><h3>What to fix next</h3><p>Ranked by mentions × stars lost, boosted when it is growing.</p></article>
           <article className="tile t-wide"><h3>Replies and release notes</h3><p>Drafts for each review by theme, checked against the 5,970 character limit and Apple’s guidance, ready to paste into App Store Connect. “Fixed:” lines for your next What’s New.</p></article>
           <article className="tile"><h3>Competitors</h3><p>Add rival apps to a project and compare themes side by side.</p></article>
-          <article className="tile"><h3>History</h3><p>Every fetch is a snapshot. Compare any two and see which themes are new.</p></article>
+          <article className="tile t-wide"><h3>History</h3><p>Every fetch is a snapshot. Compare any two and see which themes are new.</p></article>
           <article className="tile t-wide"><h3>Yours, local first</h3><p>No key, no account needed. Sign in only if you want sync across devices.</p></article>
         </div>
         <div className="row gap center-x wrap cta-end">

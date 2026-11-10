@@ -143,10 +143,10 @@ export function releaseImpact(reviews: Review[], versions: VersionInfo[]): Impac
   return out
 }
 
-/** What the timeline draws: the latest `max` versions with at least `minN` reviews (all versions if fewer than 2 qualify). */
+/** What the timeline draws: the latest `max` versions with at least `minN` reviews (all versions if none qualify). */
 export function displaySeries<T extends { n: number }>(series: T[], max = 12, minN = 5): T[] {
   const ok = series.filter(s => s.n >= minN)
-  return (ok.length >= 2 ? ok : series).slice(-max)
+  return (ok.length ? ok : series).slice(-max)
 }
 
 export function groupBy<T>(xs: T[], f: (x: T) => string): Map<string, T[]> {
