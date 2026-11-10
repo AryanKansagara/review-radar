@@ -24,7 +24,7 @@ export function useNarrow() {
 
 export function Timeline({ series, impact = [], selected, onSelect, height = 300, compact }: { series: VersionPoint[]; impact?: Impact[]; selected?: string | null; onSelect?(v: string): void; height?: number; compact?: boolean }) {
   const narrow = useNarrow()
-  const W = narrow ? 420 : 760, H = height, padL = 36, padR = 16, top = 22, chartH = H - (compact ? 64 : 130), barTop = top + chartH + 34
+  const W = narrow ? 420 : 760, H = height, padL = 52, padR = 20, top = 22, chartH = H - (compact ? 64 : 130), barTop = top + chartH + 34
   const n = series.length
   const x = (i: number) => padL + (n <= 1 ? (W - padL - padR) / 2 : (i * (W - padL - padR)) / (n - 1))
   const lo = Math.max(1, Math.floor(Math.min(...series.map(s => s.ci[0]), 4) * 2) / 2 - 0.25)

@@ -92,12 +92,12 @@ export async function runFetch(id: string, onProgress?: (label: string, p: Fetch
 }
 
 export function makeSnapshot(p: Project, reviews: Review[], label: string, at: number): Snapshot {
-  const app = p.apps[0]
-  const rs = reviews.filter(r => r.appId === app?.id)
-  const versions = buildVersions(rs, p.versions[app?.id] ?? [])
+  const appId = p.apps[0]?.id ?? 'imported'
+  const rs = reviews.filter(r => r.appId === appId)
+  const versions = buildVersions(rs, p.versions[appId] ?? [])
   const s = summarize(rs)
   return {
-    id: uuid(), label, createdAt: at, appId: app?.id ?? '', latest: versions.length ? versions[versions.length - 1].version : null, n: s.n, mean: s.mean,
+    id: uuid(), label, createdAt: at, appId, latest: versions.length ? versions[versions.length - 1].version : null, n: s.n, mean: s.mean,
     themes: themeStats(rs, p.rules).map(t => ({ id: t.id, label: t.label, n: t.n, share: t.share })),
     versions: seriesByVersion(rs, versions).map(v => ({ version: v.version, n: v.n, mean: v.mean })),
   }
@@ -109,8 +109,7 @@ export interface Filters { countries: string[] }
 export function analyze(p: Project | undefined, reviews: Review[] | null, appId?: string, countries?: string[]) {
   {
     if (!p || !reviews) return null
-    const app = p.apps.find(a => a.id === appId) ?? p.apps[0]
-    if (!app) return null
+    const app = p.apps.find(a => a.id === appId) ?? p.apps[0] ?? importedApp(p)
     const appReviews = reviews.filter(r => r.appId === app.id)
     const rs = countries?.length ? appReviews.filter(r => countries.includes(r.country)) : appReviews
     const versions = buildVersions(appReviews, p.versions[app.id] ?? [])
@@ -132,6 +131,9 @@ export function analyze(p: Project | undefined, reviews: Review[] | null, appId?
     }
   }
 }
+/** Import-only projects have no App Store app; their reviews are stored under the id 'imported'. */
+const importedApp = (p: Project): AppInfo => ({ id: 'imported', name: p.name, developer: 'Imported reviews', icon: '', genre: '', version: '', releaseNotes: '', currentVersionReleaseDate: '', rating: null, ratingCount: null, currentVersionRating: null, currentVersionRatingCount: null, url: '' })
+
 export type Analysis = NonNullable<ReturnType<typeof analyze>>
 
 export function useAnalysis(p: Project | undefined, reviews: Review[] | null, appId?: string, countries?: string[]) {
