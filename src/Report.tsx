@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { countryName } from './engine/reviews.ts'
+import { displaySeries } from './engine/stats.ts'
 import { releaseNotes } from './engine/themes.ts'
 import { CountryHeat, Dist, Timeline } from './Charts.tsx'
 import { useAnalysis, useReviews } from './projectData.ts'
@@ -40,7 +41,7 @@ export default function Report({ id }: { id: string }) {
           <p>{imp ? <>Version <b>{v}</b> averages <b>{imp.after.mean.toFixed(2)}★</b> from {imp.after.n} reviews, {signed(imp.diff)} against {imp.prev} (95% interval {imp.diffCi[0].toFixed(2)} to {imp.diffCi[1].toFixed(2)}): <b>{imp.verdict}</b>. One-star share {fmtPct(imp.before.oneStar)} → {fmtPct(imp.after.oneStar)} (Wilson 95% {fmtPct(imp.after.oneStarCi[0])} to {fmtPct(imp.after.oneStarCi[1])}).</> : <>Version {v} averages {point?.mean.toFixed(2)}★ from {point?.n} reviews. No earlier version to compare.</>}</p>
           {a.emerging.length > 0 && v === a.latest && <p>Emerging in this release: {a.emerging.map(e => `${e.label} (${fmtPct(e.before)} → ${fmtPct(e.latest)})`).join(', ')}.</p>}
         </section>
-        <section className="sheet-sec"><h2>Rating by version</h2><Timeline series={a.series} impact={a.impact} selected={v} height={260} /></section>
+        <section className="sheet-sec"><h2>Rating by version</h2><Timeline series={displaySeries(a.series)} impact={a.impact} selected={v} height={260} /></section>
         <div className="sheet-grid">
           <section className="sheet-sec"><h2>Ratings in {v}</h2>{point && <Dist dist={point.dist} />}</section>
           <section className="sheet-sec"><h2>Top themes in {v}</h2>
@@ -48,7 +49,7 @@ export default function Report({ id }: { id: string }) {
               <tbody>{vThemes.slice(0, 7).map(t => <tr key={t.id}><td>{t.label}</td><td className="num">{t.vn}</td><td className="num">{fmtPct(t.vn / Math.max(1, vr.length))}</td></tr>)}</tbody></table>
           </section>
         </div>
-        <section className="sheet-sec"><h2>What to fix next</h2>
+        <section className="sheet-sec"><h2>What to fix next <span className="muted small">(all versions)</span></h2>
           <ol className="fix-print">{a.fix.slice(0, 5).map(f => <li key={f.id}><b>{f.label}</b>: {f.why}</li>)}</ol>
         </section>
         {worst.length > 0 && <section className="sheet-sec"><h2>In their words</h2>{worst.map(r => <blockquote key={r.id} className="quote"><b>{r.rating}★ {r.title}</b> {r.body} <span className="muted">· {countryName(r.country)}, {fmtDate(r.date)}</span></blockquote>)}</section>}

@@ -260,7 +260,7 @@ table.data tbody tr:hover, table.data tbody tr.on { background: var(--surface-2)
 table.data tbody tr[class] { cursor: pointer; }
 .num { text-align: right !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
 table.heat { border-collapse: separate; border-spacing: 3px; font-size: .82rem; width: 100%; }
-table.heat th { font-weight: 500; color: var(--muted); text-align: left; padding: .3rem .5rem; white-space: nowrap; }
+table.heat th { width: 1%; font-weight: 500; color: var(--muted); text-align: left; padding: .3rem .5rem; white-space: nowrap; }
 table.heat thead th { text-align: center; }
 table.heat td { text-align: center; padding: .45rem .3rem; border-radius: 8px; background: var(--surface-2); min-width: 54px; font-variant-numeric: tabular-nums; }
 table.heat td b { display: block; font-weight: 600; }
@@ -289,7 +289,7 @@ table.heat td small { color: var(--muted); font-size: .68rem; }
 .proj-head .eyebrow { margin-bottom: .1rem; }
 .proj-head p { margin: 0; }
 .proj-title { display: flex; align-items: center; gap: .6rem; margin: 0 0 .2rem; font-size: clamp(1.6rem, 3vw, 2.2rem); }
-.title-input { font: inherit; letter-spacing: inherit; color: inherit; border: 1px solid transparent; background: transparent; padding: 0 .2rem; margin-left: -.25rem; border-radius: 8px; min-height: 0; width: 100%; max-width: 640px; }
+.title-input { font: inherit; letter-spacing: inherit; color: inherit; border: 1px solid transparent; background: transparent; padding: 0 .2rem; margin-left: -.25rem; border-radius: 8px; min-height: 0; field-sizing: content; min-width: 4ch; max-width: 100%; }
 .title-input:hover { border-color: var(--hair); }
 .tabs { display: flex; gap: .2rem; border-bottom: 1px solid var(--hair); margin-bottom: 1.2rem; overflow-x: auto; scrollbar-width: none; }
 .tabs a { padding: .65rem .9rem; color: var(--muted); font-size: .92rem; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; text-decoration: none !important; }
@@ -427,6 +427,7 @@ mark.hl { background: rgba(255, 149, 0, .28); color: inherit; border-radius: 3px
   .grade { text-align: left; }
 }
 @media (max-width: 560px) {
+  .table-wrap table.data th, .table-wrap table.data td { white-space: nowrap; }
   body { font-size: 16px; }
   .evidence, .bento, .kpis { grid-template-columns: 1fr; }
   .kpis { grid-template-columns: 1fr 1fr; }

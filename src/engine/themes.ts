@@ -15,7 +15,7 @@ export const DEFAULT_RULES: ThemeRule[] = [
   { id: 'update-bug', label: 'Bug after update', keywords: ['since the update', 'since update', 'after the update', 'after update', 'after updating', 'latest update', 'last update', 'recent update', 'new version', 'this update', 'broke', 'broken', 'stopped working', 'no longer works', 'doesnt work anymore', "doesn't work anymore"] },
 ].map(r => ({ ...r, builtin: true, enabled: true }))
 
-const STOP = new Set(('a an and are as at be been but by can could did do does dont doesnt for from get got had has have having he her his how i if im in into is it its ive just me more most my no not now of on once only or other our out over own same she should so some still such than that the their them then there these they this those to too very was way we were what when where which while who why will with would you your app apps really even also all any one get use using used much like ill youre theyre cant wont isnt wasnt didnt thing things every lot lots make made new time ever back give gave star stars review update version please thanks thank good great love bad').split(' '))
+const STOP = new Set(('a an and are as at be been but by can could did do does dont doesnt for from get got had has have having he her his how i if im in into is it its ive just me more most my no not now of on once only or other our out over own same she should so some still such than that the their them then there these they this those to too very was way we were what when where which while who why will with would you your app apps really even also all any one get use using used much like ill youre theyre cant wont isnt wasnt didnt thing things every lot lots make made new time ever back give gave since okay ok sometimes star stars review update version please thanks thank good great love bad').split(' '))
 
 export function tokenize(text: string): string[] {
   return text.toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 1 && !/^\d+$/.test(w))
@@ -85,8 +85,8 @@ export function emergingThemes(reviews: Review[], rules: ThemeRule[], latest: st
 // ---------- TF-IDF term clusters ----------
 
 /** Unigrams and bigrams after stopword removal. */
-export function terms(text: string): string[] {
-  const w = tokenize(text).filter(x => !STOP.has(x))
+export function terms(text: string, extra?: Set<string>): string[] {
+  const w = tokenize(text).filter(x => !STOP.has(x) && !extra?.has(x))
   const out = [...w]
   for (let i = 0; i + 1 < w.length; i++) out.push(`${w[i]} ${w[i + 1]}`)
   return out
@@ -143,24 +143,31 @@ export function featureRequests(reviews: Review[]): Request[] {
   for (const r of reviews) {
     for (const s of `${r.title}. ${r.body}`.split(/(?<=[.!?\n])\s+/)) {
       const m = s.match(REQ)
-      if (m) { out.push({ text: s.trim().replace(/^\W+/, '').slice(0, 220), review: r }); break }
+      if (m) { out.push({ text: s.slice(m.index).trim().replace(/^\W+/, '').slice(0, 220), review: r }); break }
     }
   }
   return out
 }
 
-/** Groups requests by their most informative term so "dark mode" asked ten ways shows once. */
+const REQ_WORDS = new Set('add added adding wish wished option options feature features request bring hoping hope great nice awesome amazing cool helpful able love see would could should consider allow let give make made way there something maybe also really'.split(' '))
+
+/** Groups requests by their most shared term (bigrams preferred) so "dark mode" asked ten ways shows once. */
 export function groupRequests(reqs: Request[]): { topic: string; n: number; examples: Request[] }[] {
   const by = new Map<string, Request[]>()
   const df = new Map<string, number>()
-  const ts = reqs.map(q => terms(q.text).filter(t => !/^(add|wish|option|feature|request|bring|hoping|great|nice|able|love|see|would|could)$/.test(t)))
-  for (const t of ts) for (const x of new Set(t)) df.set(x, (df.get(x) ?? 0) + 1)
+  const ts = reqs.map(q => [...new Set(terms(q.text, REQ_WORDS))])
+  for (const t of ts) for (const x of t) df.set(x, (df.get(x) ?? 0) + 1)
+  const weight = (t: string) => (df.get(t) ?? 0) * (t.includes(' ') ? 1.5 : 1)
   reqs.forEach((q, i) => {
-    const best = [...new Set(ts[i])].sort((a, b) => (df.get(b)! + (b.includes(' ') ? 0.5 : 0)) - (df.get(a)! + (a.includes(' ') ? 0.5 : 0)))[0] ?? 'other'
-    const topic = (df.get(best) ?? 0) >= 2 ? best : 'other'
+    const best = [...ts[i]].sort((a, b) => weight(b) - weight(a))[0]
+    const topic = best && (df.get(best) ?? 0) >= 2 ? best : 'other'
     by.set(topic, [...(by.get(topic) ?? []), q])
   })
-  return [...by].map(([topic, l]) => ({ topic, n: l.length, examples: l.slice(0, 4) })).sort((a, b) => (a.topic === 'other' ? 1 : 0) - (b.topic === 'other' ? 1 : 0) || b.n - a.n)
+  return [...by].map(([topic, l]) => {
+    const seen = new Set<string>()
+    const examples = l.filter(x => { const k = x.text.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true }).slice(0, 4)
+    return { topic, n: l.length, examples }
+  }).sort((a, b) => (a.topic === 'other' ? 1 : 0) - (b.topic === 'other' ? 1 : 0) || b.n - a.n)
 }
 
 // ---------- What to fix next ----------

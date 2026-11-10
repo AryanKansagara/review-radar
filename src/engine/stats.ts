@@ -116,19 +116,37 @@ export interface Impact {
 
 export const MIN_N = 8
 
-/** Each version against the one before it that had reviews. Verdict only when the 95% interval excludes zero. */
+/** Reviews needed in the baseline before pooling stops; apps that ship weekly have few reviews per build. */
+export const BASELINE_N = 30
+
+/**
+ * Each version against a baseline of the versions just before it: the previous version alone if it
+ * has BASELINE_N reviews, otherwise pooled with earlier ones (up to 5 versions). Verdict only when the
+ * 95% interval of the difference excludes zero and both sides have MIN_N reviews.
+ */
 export function releaseImpact(reviews: Review[], versions: VersionInfo[]): Impact[] {
   const by = groupBy(reviews, r => r.version)
   const vs = versions.filter(v => by.has(v.version))
   const out: Impact[] = []
   for (let i = 1; i < vs.length; i++) {
-    const b = by.get(vs[i - 1].version)!, a = by.get(vs[i].version)!
+    const b: Review[] = []
+    let j = i - 1
+    for (; j >= 0 && j >= i - 5; j--) { b.push(...by.get(vs[j].version)!); if (b.length >= BASELINE_N) break }
+    const first = Math.max(j, 0, i - 5)
+    const prev = first === i - 1 ? vs[i - 1].version : `${vs[first].version}–${vs[i - 1].version}`
+    const a = by.get(vs[i].version)!
     const before = summarize(b), after = summarize(a)
     const diffCi = bootstrapDiff(b.map(r => r.rating), a.map(r => r.rating))
     const verdict: Verdict = before.n < MIN_N || after.n < MIN_N ? 'too few reviews' : diffCi[1] < 0 ? 'worse' : diffCi[0] > 0 ? 'better' : 'no clear change'
-    out.push({ version: vs[i].version, prev: vs[i - 1].version, date: vs[i].date, before, after, diff: after.mean - before.mean, diffCi, oneStarDiff: after.oneStar - before.oneStar, verdict })
+    out.push({ version: vs[i].version, prev, date: vs[i].date, before, after, diff: after.mean - before.mean, diffCi, oneStarDiff: after.oneStar - before.oneStar, verdict })
   }
   return out
+}
+
+/** What the timeline draws: the latest `max` versions with at least `minN` reviews (all versions if fewer than 2 qualify). */
+export function displaySeries<T extends { n: number }>(series: T[], max = 12, minN = 5): T[] {
+  const ok = series.filter(s => s.n >= minN)
+  return (ok.length >= 2 ? ok : series).slice(-max)
 }
 
 export function groupBy<T>(xs: T[], f: (x: T) => string): Map<string, T[]> {

@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { buildVersions, cmpVersion, mergeReviews, normalizeLookup, normalizeRss, parseAppRef } from './reviews.ts'
-import { bootstrapDiff, bootstrapMean, releaseImpact, seriesByVersion, versionByCountry, weekStart, wilson } from './stats.ts'
+import { bootstrapDiff, bootstrapMean, displaySeries, releaseImpact, seriesByVersion, versionByCountry, weekStart, wilson } from './stats.ts'
 import { classify, clusters, DEFAULT_RULES, emergingThemes, featureRequests, groupRequests, releaseNotes, themeStats, whatToFix } from './themes.ts'
 import { mismatch, sentiment } from './sentiment.ts'
 import { checkReply, draftReply, RESPONSE_LIMIT } from './replies.ts'
@@ -258,4 +258,18 @@ test('CSV export escapes and includes themes', () => {
   const csv = reviewsCsv([rv({ id: 'x', title: 'Hi, there', body: 'say "hi"' })], () => ['crash', 'ads'])
   assert.equal(csv.split('\n')[1], 'x,2026-01-01,us,1.0,5,"Hi, there","say ""hi""",,"crash; ads",import')
   assert.equal(weekStart('2026-11-08T12:00:00Z'), '2026-11-02')
+})
+
+test('releaseImpact pools small previous builds into one baseline', () => {
+  const rs: Review[] = []
+  // Five weekly builds with 8 reviews each at 5 stars, then a build at 1-2 stars.
+  for (let v = 1; v <= 5; v++) for (let i = 0; i < 8; i++) rs.push(rv({ version: `1.${v}`, rating: 5 }))
+  for (let i = 0; i < 12; i++) rs.push(rv({ version: '1.6', rating: i % 2 ? 1 : 2 }))
+  const imp = releaseImpact(rs, buildVersions(rs)).find(i => i.version === '1.6')!
+  assert.equal(imp.prev, '1.2–1.5')
+  assert.equal(imp.before.n, 32)
+  assert.equal(imp.verdict, 'worse')
+  const series = [{ n: 1 }, { n: 9 }, { n: 2 }, { n: 7 }]
+  assert.deepEqual(displaySeries(series), [{ n: 9 }, { n: 7 }])
+  assert.deepEqual(displaySeries([{ n: 1 }, { n: 2 }]), [{ n: 1 }, { n: 2 }])
 })

@@ -11,7 +11,7 @@ add(3, 'best enjoy enjoyed fabulous fun great happy helpful impressed intuitive 
 add(2, 'clean cool easy effective elegant fast glad good handy improved improvement neat nice pleased quick reliable simple stable thanks thank useful well worth works')
 add(1, 'decent fine fixed ok okay polished responsive')
 add(-1, 'annoying bit confusing meh odd slow wait weird unclear')
-add(-2, 'bug buggy clunky complicated disappointed disappointing doesnt fails failed failing glitch glitchy lag laggy lost missing problem problems sad slower sluggish stuck tedious unstable wrong')
+add(-2, 'charged expensive locked overpriced ruin ruined ruins uninstall uninstalled uninstalling bug buggy clunky complicated disappointed disappointing doesnt fails failed failing glitch glitchy lag laggy lost missing problem problems sad slower sluggish stuck tedious unstable wrong')
 add(-3, 'awful bad broke broken crash crashed crashes crashing frustrating frustrated greedy hate hated horrible junk pointless poor ripoff scam stupid terrible ugly unusable useless waste worse')
 add(-4, 'abysmal disgusting garbage pathetic rubbish trash worst')
 add(-5, 'fraud')

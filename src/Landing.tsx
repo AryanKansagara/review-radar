@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { buildVersions, parseAppRef } from './engine/reviews.ts'
 import { SAMPLES, sampleReviews } from './engine/sample.ts'
-import { releaseImpact, seriesByVersion } from './engine/stats.ts'
+import { displaySeries, releaseImpact, seriesByVersion } from './engine/stats.ts'
 import { DEFAULT_RULES, themeStats } from './engine/themes.ts'
 import type { AppInfo, Review } from './engine/types.ts'
 import { fetchReviews, lookupApp, searchApps } from './live.ts'
@@ -27,10 +27,10 @@ function HeroRadar() {
   const ctl = useRef<AbortController | null>(null)
 
   const versions = useMemo(() => buildVersions(data.reviews, data.synthetic ? SAMPLES[0].versions : []), [data])
-  const series = useMemo(() => seriesByVersion(data.reviews, versions), [data, versions])
+  const series = useMemo(() => displaySeries(seriesByVersion(data.reviews, versions), 8), [data, versions])
   const impact = useMemo(() => releaseImpact(data.reviews, versions), [data, versions])
-  // Default to the release that hurt most, else the latest.
-  const worst = impact.filter(i => i.verdict === 'worse').sort((a, b) => a.diff - b.diff)[0]
+  // Default to the most recent release that hurt, else the latest.
+  const worst = impact.filter(i => i.verdict === 'worse' && series.some(s => s.version === i.version)).pop()
   const active = sel && series.some(s => s.version === sel) ? sel : worst?.version ?? series[series.length - 1]?.version ?? null
   const point = series.find(s => s.version === active)
   const imp = impact.find(i => i.version === active)
@@ -109,7 +109,7 @@ function HeroRadar() {
               </p>}
             </>}
           </div>
-          <ThemeBubbles items={themes.map(t => ({ id: t.id, label: t.label, n: t.n, mean: t.mean }))} width={330} height={190} />
+          <ThemeBubbles items={themes.filter(t => t.id !== 'missing').map(t => ({ id: t.id, label: t.label, n: t.n, mean: t.mean }))} width={330} height={190} />
         </div>
       </div>
       <div className="row between wrap gap-sm radar-foot">
@@ -168,7 +168,7 @@ export function Landing() {
           <article className="tile t-wide"><h3>Replies and release notes</h3><p>Drafts for each review by theme, checked against the 5,970 character limit and Apple’s guidance, ready to paste into App Store Connect. “Fixed:” lines for your next What’s New.</p></article>
           <article className="tile"><h3>Competitors</h3><p>Add rival apps to a project and compare themes side by side.</p></article>
           <article className="tile"><h3>History</h3><p>Every fetch is a snapshot. Compare any two and see which themes are new.</p></article>
-          <article className="tile"><h3>Yours, local first</h3><p>No key, no account needed. Sign in only if you want sync across devices.</p></article>
+          <article className="tile t-wide"><h3>Yours, local first</h3><p>No key, no account needed. Sign in only if you want sync across devices.</p></article>
         </div>
         <div className="row gap center-x wrap cta-end">
           <Link href="/app?sample=habit" className="btn primary">Try the sample</Link>

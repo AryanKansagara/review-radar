@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { countryName } from './engine/reviews.ts'
-import { MIN_N } from './engine/stats.ts'
+import { BASELINE_N, displaySeries, MIN_N } from './engine/stats.ts'
 import type { AppInfo } from './engine/types.ts'
 import { CountryHeat, Dist, ThemeBubbles, Timeline } from './Charts.tsx'
 import { analyze, bumpData, getReviews, makeSnapshot, useAnalysis, useReviews, type Analysis } from './projectData.ts'
@@ -94,7 +94,8 @@ function verdictText(v: string) { return v === 'worse' ? 'Worse' : v === 'better
 
 function Overview({ p, a }: { p: Project; a: Analysis }) {
   const [sel, setSel] = useState<string | null>(null)
-  const worst = a.impact.filter(i => i.verdict === 'worse').sort((x, y) => x.diff - y.diff)[0]
+  const [allRows, setAllRows] = useState(false)
+  const worst = a.impact.filter(i => i.verdict === 'worse').pop()
   const active = sel && a.series.some(s => s.version === sel) ? sel : a.latest
   const point = a.series.find(s => s.version === active)
   const themes = a.themes.length ? themeStatsFor(a, active) : []
@@ -108,12 +109,13 @@ function Overview({ p, a }: { p: Project; a: Analysis }) {
         <div className="kpi"><span>Average of {a.summary.n.toLocaleString()} reviews</span><b>{a.summary.mean.toFixed(2)}</b><Stars value={a.summary.mean} /></div>
         <div className="kpi"><span>Latest version {a.latest ?? 'n/a'}</span><b>{point && active === a.latest ? point.mean.toFixed(2) : a.series[a.series.length - 1]?.mean.toFixed(2) ?? 'n/a'}</b>{latestImp && <small className={latestImp.verdict === 'worse' ? 'unfav-t' : latestImp.verdict === 'better' ? 'fav-t' : 'muted'}>{signed(latestImp.diff)} vs {latestImp.prev} · {verdictText(latestImp.verdict).toLowerCase()}</small>}</div>
         <div className="kpi"><span>One-star share</span><b>{fmtPct(a.summary.oneStar)}</b><small className="muted">95% CI {fmtPct(a.summary.oneStarCi[0])} to {fmtPct(a.summary.oneStarCi[1])}</small></div>
-        <div className="kpi"><span>App Store (all ratings)</span><b>{a.app.rating ? a.app.rating.toFixed(1) : 'n/a'}</b><small className="muted">{a.app.ratingCount ? `${a.app.ratingCount.toLocaleString()} ratings` : 'Lookup data unavailable'}{a.app.currentVersionRating ? ` · current version ${a.app.currentVersionRating.toFixed(1)}` : ''}</small></div>
+        <div className="kpi"><span>App Store (all ratings)</span><b>{a.app.rating ? a.app.rating.toFixed(1) : 'n/a'}</b><small className="muted">{a.app.ratingCount ? `${a.app.ratingCount.toLocaleString()} ratings` : 'Lookup data unavailable'}{a.app.currentVersionRating ? ` · current version ${a.app.currentVersionRating.toFixed(1)}` : ''}{a.app.rating && a.app.rating - a.summary.mean > 0.5 ? '. Star-only ratings run higher than written reviews.' : ''}</small></div>
       </div>
 
       <div className="card pad">
         <div className="row between wrap gap-sm"><h2 className="h4">Rating by version</h2><span className="muted small">Dots sized by review count · band is the 95% bootstrap interval · click a version</span></div>
-        <Timeline series={a.series} impact={a.impact} selected={active} onSelect={setSel} />
+        <Timeline series={displaySeries(a.series)} impact={a.impact} selected={active} onSelect={setSel} />
+        {a.series.length > displaySeries(a.series).length && <p className="muted small">Showing the latest {displaySeries(a.series).length} of {a.series.length} versions with at least 5 reviews. The table below lists every version.</p>}
       </div>
 
       {point && (
@@ -126,19 +128,19 @@ function Overview({ p, a }: { p: Project; a: Analysis }) {
           </div>
           <div className="card pad">
             <h2 className="h4">Themes in {point.version}</h2>
-            <ThemeBubbles items={themes} width={460} height={250} onPick={() => go(`/app/p/${p.id}/themes`)} />
+            <ThemeBubbles items={themes.filter(t => t.id !== 'missing')} width={460} height={250} onPick={() => go(`/app/p/${p.id}/themes`)} />
           </div>
         </div>
       )}
 
       <div className="card pad">
         <h2 className="h4">Release impact</h2>
-        <p className="muted small">Each version against the previous one with reviews. A verdict needs the 95% interval of the difference to exclude zero, and at least {MIN_N} reviews on each side.</p>
+        <p className="muted small">Each version against the version before it, pooled with earlier builds until the baseline has {BASELINE_N} reviews. A verdict needs the 95% interval of the difference to exclude zero, and at least {MIN_N} reviews on each side.</p>
         <div className="table-wrap">
           <table className="data">
             <thead><tr><th scope="col">Version</th><th scope="col">Released</th><th scope="col" className="num">Reviews</th><th scope="col" className="num">Mean</th><th scope="col" className="num">Change</th><th scope="col">95% CI of change</th><th scope="col" className="num">1★ share</th><th scope="col">Verdict</th></tr></thead>
             <tbody>
-              {[...a.impact].reverse().map(i => (
+              {[...a.impact].reverse().slice(0, allRows ? undefined : 12).map(i => (
                 <tr key={i.version} className={i.version === active ? 'on' : ''} onClick={() => setSel(i.version)}>
                   <th scope="row">{i.version}</th><td>{fmtDate(i.date)}</td><td className="num">{i.after.n}</td><td className="num">{i.after.mean.toFixed(2)}</td>
                   <td className={`num ${i.verdict === 'worse' ? 'unfav-t' : i.verdict === 'better' ? 'fav-t' : ''}`}>{signed(i.diff)}</td>
@@ -151,6 +153,7 @@ function Overview({ p, a }: { p: Project; a: Analysis }) {
             </tbody>
           </table>
         </div>
+        {a.impact.length > 12 && <button type="button" className="btn ghost sm" onClick={() => setAllRows(!allRows)}>{allRows ? 'Show the latest 12' : `Show all ${a.impact.length} versions`}</button>}
       </div>
 
       {new Set(a.byCountry.map(c => c.country)).size > 1 && (

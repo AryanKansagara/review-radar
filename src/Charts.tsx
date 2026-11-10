@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Impact, VersionPoint } from './engine/stats.ts'
 import { countryName } from './engine/reviews.ts'
 import { fmtDate, fmtPct } from './ui.tsx'
@@ -10,8 +10,21 @@ export function ratingColor(m: number): string {
   return `hsl(${hue.toFixed(0)} 78% ${t < 0.5 ? 52 : 42}%)`
 }
 
+/** True below 600px wide, so charts can draw with fewer, larger units on phones. */
+export function useNarrow() {
+  const [narrow, setNarrow] = useState(() => matchMedia('(max-width: 600px)').matches)
+  useEffect(() => {
+    const m = matchMedia('(max-width: 600px)')
+    const f = () => setNarrow(m.matches)
+    m.addEventListener('change', f)
+    return () => m.removeEventListener('change', f)
+  }, [])
+  return narrow
+}
+
 export function Timeline({ series, impact = [], selected, onSelect, height = 300, compact }: { series: VersionPoint[]; impact?: Impact[]; selected?: string | null; onSelect?(v: string): void; height?: number; compact?: boolean }) {
-  const W = 760, H = height, padL = 36, padR = 16, top = 22, chartH = H - (compact ? 64 : 92), barTop = top + chartH + 34
+  const narrow = useNarrow()
+  const W = narrow ? 420 : 760, H = height, padL = 36, padR = 16, top = 22, chartH = H - (compact ? 64 : 130), barTop = top + chartH + 34
   const n = series.length
   const x = (i: number) => padL + (n <= 1 ? (W - padL - padR) / 2 : (i * (W - padL - padR)) / (n - 1))
   const lo = Math.max(1, Math.floor(Math.min(...series.map(s => s.ci[0]), 4) * 2) / 2 - 0.25)
@@ -23,7 +36,7 @@ export function Timeline({ series, impact = [], selected, onSelect, height = 300
   const label = (s: VersionPoint) => `Version ${s.version}, ${fmtDate(s.date)}: ${s.mean.toFixed(2)} stars from ${s.n} reviews, 95% interval ${s.ci[0].toFixed(2)} to ${s.ci[1].toFixed(2)}, ${fmtPct(s.oneStar)} one-star`
   if (!n) return <div className="chart-empty">No versioned reviews yet.</div>
   return (
-    <svg className="timeline" viewBox={`0 0 ${W} ${H}`} role="group" aria-label="Average rating by app version with 95% intervals">
+    <svg className="timeline" viewBox={`0 0 ${W} ${compact ? top + chartH + 30 : H}`} role="group" aria-label="Average rating by app version with 95% intervals">
       {ticks.map(t => <g key={t}><line x1={padL} x2={W - padR} y1={y(t)} y2={y(t)} className="grid" /><text x={padL - 10} y={y(t) + 4} className="axis" textAnchor="end">{t}★</text></g>)}
       {band && <path d={band} className="band" />}
       <path d={line} className="line" />
@@ -41,17 +54,25 @@ export function Timeline({ series, impact = [], selected, onSelect, height = 300
             <circle cx={x(i)} cy={y(s.mean)} r={r} fill={ratingColor(s.mean)} className="dot" />
             {imp?.verdict === 'worse' && <text x={x(i)} y={y(s.ci[1]) - 10} textAnchor="middle" className="verdict worse">▼ {imp.diff.toFixed(2)}</text>}
             {imp?.verdict === 'better' && <text x={x(i)} y={y(s.ci[1]) - 10} textAnchor="middle" className="verdict better">▲ +{imp.diff.toFixed(2)}</text>}
-            <text x={x(i)} y={top + chartH + 20} textAnchor="middle" className={`vlabel${sel ? ' on' : ''}`}>{s.version}</text>
+            {(!narrow || n <= 6 || sel || (n - 1 - i) % 2 === 0) && <text x={x(i)} y={top + chartH + 20} textAnchor="middle" className={`vlabel${sel ? ' on' : ''}`}>{s.version}</text>}
             {!compact && <>
               <rect x={x(i) - 9} y={barTop + 46 - bh} width="18" height={Math.max(bh, 1)} rx="3" className="onebar" />
-              <text x={x(i)} y={barTop + 60} textAnchor="middle" className="axis">{fmtPct(s.oneStar)}</text>
+              {(!narrow || n <= 6 || (n - 1 - i) % 2 === 0) && <text x={x(i)} y={barTop + 60} textAnchor="middle" className="axis">{fmtPct(s.oneStar)}</text>}
             </>}
           </g>
         )
       })}
-      {!compact && <text x={padL - 10} y={barTop + 30} className="axis" textAnchor="end">1★</text>}
+      {!compact && <text x={padL - 10} y={barTop + 30} className="axis" textAnchor="end">1★ %</text>}
     </svg>
   )
+}
+
+/** First word of the label, shrunk to fit the circle, and abbreviated if it still would not fit at 9px. */
+function bubbleFont(label: string, r: number) {
+  const w = label.split(' ')[0]
+  const size = Math.min(15, (r * 1.8) / (w.length * 0.6))
+  if (size >= 9) return { size, text: w }
+  return { size: 9, text: w.slice(0, Math.max(2, Math.floor((r * 1.8) / (9 * 0.6)) - 1)) + '.' }
 }
 
 interface Bubble { id: string; label: string; n: number; mean: number }
@@ -62,7 +83,7 @@ export function packBubbles(items: Bubble[], W: number, H: number) {
   const scale = Math.min(W, H) / 4.6
   const placed: { b: Bubble; x: number; y: number; r: number }[] = []
   for (const b of [...items].sort((a, c) => c.n - a.n)) {
-    const r = Math.max(18, scale * Math.sqrt(b.n / max))
+    const r = Math.max(26, scale * Math.sqrt(b.n / max))
     let t = 0, px = W / 2, py = H / 2
     for (; t < 600; t += 0.35) {
       px = W / 2 + Math.cos(t) * t * 3.2 * (W / H > 1.3 ? 1.5 : 1)
@@ -85,7 +106,7 @@ export function ThemeBubbles({ items, onPick, active, width = 520, height = 300 
           aria-label={`${b.label}: ${b.n} reviews, average ${b.mean.toFixed(1)} stars`} onClick={() => onPick?.(b.id)} onKeyDown={e => { if (e.key === 'Enter' && onPick) onPick(b.id) }}>
           <title>{`${b.label}: ${b.n} reviews, ${b.mean.toFixed(1)}★`}</title>
           <circle cx={x} cy={y} r={r} fill={ratingColor(b.mean)} />
-          {r > 30 && <text x={x} y={y - (r > 44 ? 4 : 0)} textAnchor="middle" className="bub-l" style={{ fontSize: Math.min(15, r / 3.6) }}>{b.label.split(' ')[0]}</text>}
+          <text x={x} y={y + (r > 44 ? -4 : 4)} textAnchor="middle" className="bub-l" style={{ fontSize: bubbleFont(b.label, r).size }}>{bubbleFont(b.label, r).text}</text>
           {r > 44 && <text x={x} y={y + 14} textAnchor="middle" className="bub-n">{b.n}</text>}
         </g>
       ))}

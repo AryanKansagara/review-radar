@@ -21,7 +21,7 @@ export default function Data({ p }: { p: Project }) {
       {!p.sampleId && <VersionsPanel p={p} />}
       <div className="card pad stack-sm">
         <h2 className="h4">Stored data</h2>
-        <p className="small">{count === null ? 'Counting…' : `${plural(count, 'review')} on this device (${(size / 1e6).toFixed(2)} MB).`} {size > RAW_SYNC_LIMIT ? 'Over the 1.5 MB sync cap: when signed in, the project, rules, version lists and snapshots sync, but the reviews stay here.' : 'Within the sync cap: if you sign in, reviews sync too.'}</p>
+        <p className="small">{count === null ? 'Counting…' : `${plural(count, 'review')} on this device (${(size / 1e6).toFixed(2)} MB).`} {p.sampleId ? 'Samples are rebuilt from their seed on each device, so only the project settings and snapshots sync.' : size > RAW_SYNC_LIMIT ? 'Over the 1.5 MB sync cap: when signed in, the project, rules, version lists and snapshots sync, but the reviews stay here.' : 'Within the sync cap: if you sign in, reviews sync too.'}</p>
         {p.imports.length > 0 && <ul className="small imports">{[...p.imports].reverse().map(i => <li key={i.id}>{fmtDate(new Date(i.at).toISOString())} · {i.kind === 'versions' ? 'Version list' : 'Reviews'} · {i.fileName} ({i.format}) · {i.rows} rows · {i.issues} issues</li>)}</ul>}
         {!p.sampleId && !!count && <button type="button" className="btn danger-ghost sm" onClick={async () => {
           const rs = await getReviews(p)
