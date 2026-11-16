@@ -59,7 +59,7 @@ export async function fetchReviews(appId: string, countries: string[], pages: nu
           let rs = normalizeRss(feed, appId, c)
           const setLast = (f: unknown, n: number) => { const l = feedLastPage(f); known = l !== null; last = l ?? (n < 50 ? 1 : pages) }
           if (p === 1) setLast(feed, rs.length)
-          if (rs.length < 50 && (p === 1 || p < last)) {
+          if (rs.length < 50 && (p === 1 || (known && p < last))) {
             const again = await get(alt, signal).catch(() => null)
             const rs2 = normalizeRss(again, appId, c)
             if (rs2.length > rs.length) { rs = rs2; feed = again; if (p === 1) setLast(feed, rs.length) }
