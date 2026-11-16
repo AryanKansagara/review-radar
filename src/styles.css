@@ -420,7 +420,7 @@ mark.hl { background: rgba(255, 149, 0, .28); color: inherit; border-radius: 3px
   .nav a { font-size: 1rem; padding: .6rem .5rem; }
   .burger { display: inline-grid; }
   .hide-sm { display: none !important; }
-  .grid-2, .radar-split, .sheet-grid { grid-template-columns: 1fr; }
+  .grid-2, .radar-split, .sheet-grid { grid-template-columns: minmax(0, 1fr); }
   .tile.t-wide { grid-column: auto; }
   .sheet { padding: 1.4rem; }
   .sheet-head { flex-direction: column; }
@@ -441,3 +441,6 @@ mark.hl { background: rgba(255, 149, 0, .28); color: inherit; border-radius: 3px
   .proj-grid { grid-template-columns: 1fr; }
   .radar-form .btn { padding-inline: .8rem; }
 }
+
+/* Long endpoint paths in prose wrap instead of widening the page. */
+.docs li code, .docs p code { overflow-wrap: anywhere; }

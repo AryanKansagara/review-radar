@@ -4,7 +4,7 @@ import { SAMPLES, sampleReviews } from './engine/sample.ts'
 import { displaySeries, releaseImpact, seriesByVersion } from './engine/stats.ts'
 import { DEFAULT_RULES, themeStats } from './engine/themes.ts'
 import type { AppInfo, Review } from './engine/types.ts'
-import { fetchReviews, lookupApp, searchApps } from './live.ts'
+import { fetchReviews, lookupApp, looksLikeOutage, OUTAGE_NOTE, searchApps } from './live.ts'
 import { createAppProject, createSampleProject } from './projectData.ts'
 import { ThemeBubbles, Timeline } from './Charts.tsx'
 import { fmtDate, fmtPct, go, Link, Stars, SyntheticBadge, toast } from './ui.tsx'
@@ -51,7 +51,9 @@ function HeroRadar() {
       const country = ref?.country ?? 'us'
       setBusy(`Reading recent ${app.name} reviews`)
       const cs = [...new Set([country, 'us', 'gb'])].slice(0, 2)
-      const { reviews } = await fetchReviews(app.id, cs, 4, pr => setBusy(`Reading reviews · ${pr.reviews} so far`), c.signal)
+      const res = await fetchReviews(app.id, cs, 4, pr => setBusy(`Reading reviews · ${pr.reviews} so far`), c.signal)
+      const { reviews } = res
+      if (looksLikeOutage(res, cs, app.ratingCount)) throw new Error(`${OUTAGE_NOTE} ${app.name} was found, but its reviews could not be read.`)
       if (!reviews.length) throw new Error(`${app.name} has no recent written reviews in ${cs.join(', ').toUpperCase()}.`)
       setSel(null)
       setData({ app, reviews, synthetic: false, country })

@@ -15,26 +15,58 @@ export const DEFAULT_RULES: ThemeRule[] = [
   { id: 'update-bug', label: 'Bug after update', keywords: ['since the update', 'since update', 'after the update', 'after update', 'after updating', 'latest update', 'last update', 'recent update', 'new version', 'this update', 'broke', 'broken', 'stopped working', 'no longer works', 'doesnt work anymore', "doesn't work anymore"] },
 ].map(r => ({ ...r, builtin: true, enabled: true }))
 
-const STOP = new Set(('a an and are as at be been but by can could did do does dont doesnt for from get got had has have having he her his how i if im in into is it its ive just me more most my no not now of on once only or other our out over own same she should so some still such than that the their them then there these they this those to too very was way we were what when where which while who why will with would you your app apps really even also all any one get use using used much like ill youre theyre cant wont isnt wasnt didnt thing things every lot lots make made new time ever back give gave since okay ok sometimes star stars review update version please thanks thank good great love bad').split(' '))
+/**
+ * Translations of the built-in themes for the larger non-English storefronts. They apply to a built-in rule
+ * for as long as it is enabled and are not stored with the project, so editing the English keywords never loses them.
+ * Japanese has no spaces between words, so those phrases match anywhere in the text.
+ */
+export const INTL: Record<string, string[]> = {
+  crash: ['stürzt ab', 'stürzt ständig ab', 'absturz', 'abstürze', 'abgestürzt', 'hängt sich auf', 'öffnet sich nicht', 'startet nicht', 'plante', 'plantage', 'crashe', 'ne s’ouvre pas', 'ne se lance pas', 'se cierra', 'se cierra sola', 'se cuelga', 'no abre', 'no se abre', 'trava', 'travando', 'fecha sozinho', 'não abre', 'si blocca', 'si chiude', 'non si apre', 'クラッシュ', '落ちる', '落ちます', '強制終了', '起動しない', '開けない', '開かない', 'フリーズ'],
+  login: ['anmelden', 'anmeldung', 'einloggen', 'passwort', 'connexion', 'me connecter', 'se connecter', 'mot de passe', 'iniciar sesión', 'contraseña', 'senha', 'fazer login', 'entrar na conta', 'accedere', 'accesso', 'ログイン', 'パスワード', 'サインイン'],
+  paywall: ['abo', 'abonnement', 'abos', 'kostenpflichtig', 'bezahlen', 'teuer', 'zu teuer', 'abzocke', 'abonnement payant', 'payant', 'payante', 'trop cher', 'payer', 'suscripción', 'de pago', 'caro', 'muy caro', 'pagar', 'cobran', 'assinatura', 'pago', 'cobrança', 'abbonamento', 'a pagamento', 'costoso', '課金', '有料', '高すぎ', 'サブスク', '値上げ'],
+  ads: ['werbung', 'werbeanzeigen', 'anzeigen', 'pub', 'pubs', 'publicité', 'publicités', 'anuncios', 'publicidad', 'anúncios', 'propaganda', 'propagandas', 'pubblicità', '広告'],
+  sync: ['synchronisiert', 'synchronisierung', 'synchronisation', 'synchronisieren', 'daten verloren', 'daten weg', 'synchroniser', 'données perdues', 'perdu toutes', 'sincroniza', 'sincronización', 'perdí todo', 'perdí mis', 'sincronização', 'perdi tudo', 'perdi meus', 'sincronizza', 'sincronizzazione', 'perso tutto', '同期', 'データが消え', 'バックアップ'],
+  battery: ['akku', 'akkuverbrauch', 'batterie', 'batería', 'bateria', 'batteria', 'バッテリー', '電池'],
+  ui: ['neues design', 'neue design', 'unübersichtlich', 'altes design', 'alte version', 'nouvelle interface', 'nouveau design', 'ancienne version', 'nuevo diseño', 'versión anterior', 'confuso', 'novo design', 'versão antiga', 'nuova interfaccia', 'vecchia versione', 'デザイン', '使いにくい', '使いづらい', '前の方が'],
+  missing: ['fehlt', 'wünsche mir', 'wäre schön', 'wäre toll', 'bitte hinzufügen', 'manque', 'il manque', 'ce serait bien', 'serait bien', 'falta', 'sería genial', 'ojalá', 'seria ótimo', 'manca', 'sarebbe bello', '欲しい', 'ほしい', '追加して', '対応して'],
+  performance: ['langsam', 'ruckelt', 'lädt ewig', 'ladezeit', 'ladezeiten', 'lent', 'lente', 'lenteur', 'rame', 'lento', 'lenta', 'tarda mucho', 'demora', 'lentissima', '重い', '遅い', 'もっさり'],
+  'update-bug': ['seit dem update', 'seit dem letzten update', 'nach dem update', 'seit update', 'funktioniert nicht mehr', 'geht nicht mehr', 'depuis la mise à jour', 'depuis la dernière mise à jour', 'ne fonctionne plus', 'ne marche plus', 'desde la actualización', 'después de actualizar', 'ya no funciona', 'dejó de funcionar', 'depois da atualização', 'após a atualização', 'não funciona mais', 'parou de funcionar', 'dopo l’aggiornamento', 'non funziona più', 'アップデートしてから', 'アップデート後', 'アプデ後', '使えなくなっ'],
+}
 
+const STOP = new Set(('a an and are as at be been but by can could did do does dont doesnt for from get got had has have having he her his how i if im in into is it its ive just me more most my no not now of on once only or other our out over own same she should so some still such than that the their them then there these they this those to too very was way we were what when where which while who why will with would you your app apps really even also all any one get use using used much like ill youre theyre cant wont isnt wasnt didnt thing things every lot lots make made new time ever back give gave since okay ok sometimes star stars review update version please thanks thank good great love bad ' +
+  'about after again am because before being both cannot couldnt down during each few here him himself hers id let lets may might must off onto ourselves shall shouldnt up upon us were whom yet yours youve wouldnt havent hasnt arent werent thats theres whats going go goes went want wants wanted need needs needed keep keeps try tried trying know say says said see seem seems think thought already always never nothing something anything everything though although until without within lol pls plz im ' +
+  // German, French, Spanish, Portuguese and Italian function words, so clusters in those storefronts show the complaint, not the grammar.
+  'der die das den dem des ein eine einen einem einer und oder aber ist sind war ich du er sie es wir ihr mir mich dir dich mein meine nicht kein keine auch nur noch schon sehr mit von für fur auf aus bei nach zu zum zur im am um als wie wenn dass daß man hat habe haben kann wird werden wurde mehr immer wieder diese dieser dieses einfach leider bitte danke mal so da hier jetzt seit über uber durch vor ohne bis was wer wo weil doch sich mich ' +
+  'le la les un une des du de et ou mais est sont était je tu il elle nous vous ils elles mon ma mes ce cette ces ne pas plus très tres avec pour sur dans par en au aux que qui quoi dont où si tout tous toute toutes bien fait faire être avoir ai as avez ont suis cest jai nest sans depuis encore aussi comme on se sa son ses leur leurs merci trop peu ' +
+  'el los las uno una unos unas y o pero es son era yo tú tu él ella nosotros mi mis su sus no muy con para por en al del que quien como cuando si todo todos toda todas más mas ya hay tiene tengo hace hacer está esta están este esto estos estas sin desde también tambien porque me te se lo le les gracias ' +
+  'os um uma uns umas e ou mas é são eu ele ela nós meu minha seu sua não nao muito com para por em no na nos nas ao aos do da dos das que quem como quando se tudo todos toda mais já ja tem tenho faz fazer está estão este esta isso isto sem desde também tambem porque obrigado obrigada pra pro ' +
+  'il lo gli uno i e o ma è sono ero io lui lei noi voi loro mio mia suo sua non molto con per su tra fra nel nella nei nelle al allo alla ai agli alle dal dalla che chi come quando se tutto tutti tutta più piu già gia ha ho hanno fa fare questo questa questi queste senza da anche perché perche mi ti si ci vi grazie').split(' '))
+
+const CJK = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/
+
+/** Lowercase words. Letters of every script are kept, so "stürzt" and "français" stay whole. */
 export function tokenize(text: string): string[] {
-  return text.toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 1 && !/^\d+$/.test(w))
+  return text.toLowerCase().replace(/[’'`´]/g, '').replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(w => w.length > 1 && !/^\d+$/.test(w))
 }
 
 const norm = (s: string) => ' ' + tokenize(s).join(' ') + ' '
 const kwCache = new Map<string, string>()
 const kw = (k: string) => { let v = kwCache.get(k); if (v === undefined) { v = ' ' + tokenize(k).join(' ') + ' '; kwCache.set(k, v) } return v }
 
+const keywordsOf = (rule: ThemeRule) => rule.builtin && INTL[rule.id] ? [...rule.keywords, ...INTL[rule.id]] : rule.keywords
+/** Whole-word match for spaced scripts; plain substring for Japanese, Chinese and Korean phrases. */
+const hit = (k: string, t: string, raw: string) => CJK.test(k) ? raw.includes(k.toLowerCase()) : !!kw(k).trim() && t.includes(kw(k))
+
 /** Theme ids that match a review (title + body), in rule order. */
 export function classify(r: Pick<Review, 'title' | 'body'>, rules: ThemeRule[]): string[] {
-  const t = norm(`${r.title} ${r.body}`)
-  return rules.filter(x => x.enabled && x.keywords.some(k => kw(k).trim() && t.includes(kw(k)))).map(x => x.id)
+  const raw = `${r.title} ${r.body}`.toLowerCase(), t = norm(raw)
+  return rules.filter(x => x.enabled && keywordsOf(x).some(k => hit(k, t, raw))).map(x => x.id)
 }
 
 /** Which keywords matched, for explaining a classification in the UI. */
 export function matchedKeywords(r: Pick<Review, 'title' | 'body'>, rule: ThemeRule): string[] {
-  const t = norm(`${r.title} ${r.body}`)
-  return rule.keywords.filter(k => kw(k).trim() && t.includes(kw(k)))
+  const raw = `${r.title} ${r.body}`.toLowerCase(), t = norm(raw)
+  return keywordsOf(rule).filter(k => hit(k, t, raw))
 }
 
 export interface ThemeStat {
@@ -99,8 +131,10 @@ export interface Cluster { terms: string[]; n: number; mean: number; reviews: Re
  * by their highest-scoring term. Terms already covered by an earlier cluster are skipped, and
  * each cluster label adds the strongest co-occurring terms.
  */
-export function clusters(reviews: Review[], k = 8, maxRating = 3): Cluster[] {
-  const docs = reviews.map(r => ({ r, t: new Set(terms(`${r.title} ${r.body}`)) }))
+export function clusters(reviews: Review[], k = 8, maxRating = 3, appName = ''): Cluster[] {
+  // The app's own name is in half the reviews and says nothing about the complaint.
+  const own = new Set(tokenize(appName))
+  const docs = reviews.map(r => ({ r, t: new Set(terms(`${r.title} ${r.body}`, own)) }))
   const N = docs.length
   if (!N) return []
   const df = new Map<string, number>()

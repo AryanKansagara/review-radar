@@ -13,7 +13,7 @@ export function parseAppRef(input: string): { id: string; country: string } | nu
 
 /** Numeric-aware version compare: 3.10 > 3.9, 3.2.1 > 3.2. */
 export function cmpVersion(a: string, b: string): number {
-  const pa = a.split(/[.\-\s]/), pb = b.split(/[.\-\s]/)
+  const pa = cleanVersion(a).split(/[.\-\s]/), pb = cleanVersion(b).split(/[.\-\s]/)
   for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
     const x = pa[i] ?? '0', y = pb[i] ?? '0'
     const nx = Number(x), ny = Number(y)
@@ -22,6 +22,9 @@ export function cmpVersion(a: string, b: string): number {
   }
   return 0
 }
+
+/** "v3.73.55" and " 3.73.55 " are the same release as "3.73.55"; the feed carries all three spellings. */
+export const cleanVersion = (v: string) => v.trim().replace(/^v(?=\d)/i, '')
 
 const lab = (o: unknown): string => (o && typeof o === 'object' && 'label' in o ? String((o as { label: unknown }).label ?? '') : '')
 
@@ -35,19 +38,32 @@ export function normalizeRss(feed: unknown, appId: string, country: string): Rev
     const rating = Number(lab(e['im:rating']))
     if (!rating) continue
     const id = lab(e.id)
+    const date = new Date(lab(e.updated))
+    if (isNaN(+date)) continue
     out.push({
       id: id || hashId(`${lab(e.updated)}|${lab(e.title)}|${lab(e.content)}`),
       appId, country: country.toLowerCase(),
       rating: Math.min(5, Math.max(1, Math.round(rating))),
-      version: lab(e['im:version']) || 'unknown',
+      version: cleanVersion(lab(e['im:version'])) || 'unknown',
       title: lab(e.title),
       body: lab(e.content),
       author: lab((e.author as Record<string, unknown> | undefined)?.name),
-      date: new Date(lab(e.updated)).toISOString(),
+      date: date.toISOString(),
       source: 'rss',
     })
   }
   return out
+}
+
+/** How many pages the feed says exist (its rel="last" link), or null when the feed does not say. */
+export function feedLastPage(feed: unknown): number | null {
+  const links = (feed as { feed?: { link?: unknown } })?.feed?.link
+  for (const l of Array.isArray(links) ? links : []) {
+    const at = (l as { attributes?: { rel?: string; href?: string } })?.attributes
+    const m = at?.rel === 'last' ? at.href?.match(/page=(\d+)/) : null
+    if (m) return +m[1]
+  }
+  return null
 }
 
 export function normalizeLookup(json: unknown): AppInfo | null {

@@ -54,6 +54,41 @@ const PHOTO_MEH = [
   ['Battery', 'Drains battery quickly while editing and the phone gets hot.'],
 ]
 
+// Germany and France get reviews in their own language, as the real storefront feeds do.
+const LOCAL: Record<string, Partial<Record<'crash' | 'praise' | 'meh', string[][]>>> = {
+  de: {
+    crash: [
+      ['Stürzt beim Start ab', 'Seit dem Update stürzt die App sofort ab, wenn ich sie öffne. iPhone 14, iOS 26. Nicht mehr nutzbar.'],
+      ['Absturz nach Update', 'Nach dem Update startet nicht mehr. Schwarzer Bildschirm, dann Absturz. Neuinstallation hilft nicht.'],
+      ['Geht nicht mehr', 'Funktioniert nicht mehr seit dem letzten Update. Habe für Pro bezahlt und kann die App nicht öffnen.'],
+      ['Bitte beheben', 'Die App öffnet sich nicht mehr. Absturz bei jedem Start, auch nach Neustart des iPhones.'],
+      ['Crashes on launch', 'Since the update it crashes immediately when I open it. System language is German if that matters.'],
+    ],
+    praise: [
+      ['Super App', 'Die Gradationskurven und Masken sind hervorragend. Bester Editor auf dem iPhone.'],
+      ['Sehr gut', 'Schnell, übersichtlich und die Film-Presets sind wunderschön.'],
+      ['Lohnt sich', 'Hat Lightroom bei mir ersetzt. Die RAW-Unterstützung ist ausgezeichnet.'],
+      ['Top', 'Der neue Reparaturpinsel ist klasse. Ein Stapelexport fehlt mir noch.'],
+    ],
+    meh: [['Langsamer Export', 'Der Export ist bei großen RAW-Dateien langsam und ruckelt. Sonst gut.'], ['Akku', 'Akkuverbrauch beim Bearbeiten ist hoch und das iPhone wird warm.']],
+  },
+  fr: {
+    praise: [
+      ['Excellent', 'Les courbes et les masques sont superbes. Le meilleur éditeur sur iPhone.'],
+      ['Très belle app', 'Rapide, intuitive, et les préréglages argentiques sont magnifiques.'],
+      ['Vaut son prix', 'A remplacé Lightroom pour moi. Il manque juste un export par lot.'],
+    ],
+    crash: [['Plante au lancement', 'Depuis la mise à jour, l’application plante dès l’ouverture. Impossible de l’utiliser.']],
+    meh: [['Export lent', 'L’export est lent sur les gros fichiers RAW. Sinon très bien.']],
+  },
+}
+
+// Short follow-ups real reviewers tack on. They vary the text without changing what a review is about.
+const TAILS: Record<'good' | 'bad', string[]> = {
+  good: ['', '', '', '', ' Five stars.', ' Keep it up!', ' Been using it for about a year.', ' Recommended it to my sister.', ' Worth every penny.', ' Thank you!!', ' Only app I open every day.', ' 10/10'],
+  bad: ['', '', '', ' Please fix this.', ' Fix it and I will change my rating.', ' Was a 5 star app before.', ' Long time user here.', ' Really disappointed.', ' iPhone 15 Pro.', ' Looking for an alternative now.', ' Support has not replied.'],
+}
+
 function info(id: string, name: string, developer: string, genre: string, version: string, date: string, rating: number, notes: string): AppInfo {
   return { id, name, developer, icon: '', genre, version, releaseNotes: notes, currentVersionReleaseDate: date + 'T08:00:00Z', rating, ratingCount: 18400, currentVersionRating: null, currentVersionRatingCount: null, url: '' }
 }
@@ -84,7 +119,8 @@ export const SAMPLES: Sample[] = [
   },
 ]
 
-const NAMES = ['mkr', 'JoJo', 'sunny_days', 'Pat W', 'runner88', 'ellie', 'Ben', 'quietfox', 'Ana M', 'tomasz', 'Kiki', 'drew', 'mapleleaf', 'Lena', 'ozzie', 'Sam K']
+const NAMES = ['mkr', 'JoJo', 'sunny_days', 'Pat W', 'runner88', 'ellie', 'Ben', 'quietfox', 'Ana M', 'tomasz', 'Kiki', 'drew', 'mapleleaf', 'Lena', 'ozzie', 'Sam K', 'Jess4821', 'hikergal_pnw', 'D.Okafor', 'the real mike', 'nicknametaken22', 'Priya S.', 'cjw_92', 'Momof3boys', 'xX_Luca_Xx', 'Hannah B', 'oldmanriver', 'Yuki', 'coffee&code', 'Tobi1987', 'Marie-Claire', 'fkshdjs', 'Beto', 'Granny Sue', 'r.novak', 'iPadUser2019']
+const SUFFIX = ['', '', '', '', '', '', '7', '_', '22', '01', '.', ' ']
 const pick = <T,>(xs: T[], r: () => number) => xs[Math.floor(r() * xs.length)]
 
 /** Builds the review set for a sample app. Each review lands within its version's window. */
@@ -92,6 +128,10 @@ export function sampleReviews(id: string): Review[] {
   const s = SAMPLES.find(x => x.id === id)
   if (!s) return []
   const r = rng(id === 'habit' ? 42 : 99)
+  // Wording draws come from their own stream, so ratings, dates and counts stay what they always were.
+  const w = rng(id === 'habit' ? 4242 : 9999)
+  const author = () => (pick(NAMES, w) + pick(SUFFIX, w)).trim()
+  const vary = (body: string, rating: number) => body + (/[a-z]\.$|!$/.test(body) ? pick(TAILS[rating >= 4 ? 'good' : 'bad'], w) : '')
   const out: Review[] = []
   const end = Date.parse('2026-11-08T00:00:00Z')
   s.versions.forEach((v, vi) => {
@@ -114,9 +154,15 @@ export function sampleReviews(id: string): Review[] {
           else if (u < crash + 0.08) { pool = PHOTO_MEH; rating = 3 }
           else { pool = PHOTO_PRAISE; rating = r() < 0.8 ? 5 : 4 }
         }
-        const [title, body] = pick(pool, r)
+        let [title, body] = pick(pool, r)
+        const kind = pool === CRASH ? 'crash' : pool === PHOTO_PRAISE ? 'praise' : pool === PHOTO_MEH ? 'meh' : null
+        const local = kind && LOCAL[country]?.[kind]
+        // Most reviews in a storefront are in its language; a minority write in English.
+        if (local && w() < 0.8) [title, body] = pick(local, w)
+        else body = vary(body, rating)
         const t = start + r() * (stop - start)
-        out.push({ id: `s${s.app.id.slice(-1)}-${v.version}-${country}-${i}`, appId: s.app.id, country, rating, version: v.version, title, body, author: pick(NAMES, r), date: new Date(t).toISOString(), source: 'sample' })
+        out.push({ id: `s${s.app.id.slice(-1)}-${v.version}-${country}-${i}`, appId: s.app.id, country, rating, version: v.version, title, body, // The unused draw keeps the rating stream aligned with earlier releases of the sample.
+          author: (pick(NAMES, r), author()), date: new Date(t).toISOString(), source: 'sample' })
       }
     }
   })
@@ -125,7 +171,7 @@ export function sampleReviews(id: string): Review[] {
       const u = r()
       const [pool, rating] = u < 0.08 ? [MEH, 3] : u < 0.13 ? [[['Ads everywhere', 'Too many ads between check-ins. Pop up ads after every habit.']], 2] : [PRAISE, r() < 0.8 ? 5 : 4]
       const [title, body] = pick(pool as string[][], r)
-      out.push({ id: `c3-${i}`, appId: s.competitor.id, country: 'us', rating: rating as number, version: r() < 0.5 ? '2.7' : '2.8', title, body, author: pick(NAMES, r), date: new Date(Date.parse('2026-08-01') + r() * 90 * 864e5).toISOString(), source: 'sample' })
+      out.push({ id: `c3-${i}`, appId: s.competitor.id, country: 'us', rating: rating as number, version: r() < 0.5 ? '2.7' : '2.8', title, body: vary(body, rating as number), author: (pick(NAMES, r), author()), date: new Date(Date.parse('2026-08-01') + r() * 90 * 864e5).toISOString(), source: 'sample' })
     }
   }
   return out.sort((a, b) => b.date.localeCompare(a.date))

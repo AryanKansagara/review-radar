@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { buildVersions, cmpVersion, mergeReviews } from './engine/reviews.ts'
+import { buildVersions, cleanVersion, cmpVersion, mergeReviews } from './engine/reviews.ts'
 import { SAMPLES, sampleReviews } from './engine/sample.ts'
 import { releaseImpact, seriesByVersion, summarize, versionByCountry, weekly } from './engine/stats.ts'
 import { classify, clusters, emergingThemes, featureRequests, groupRequests, themeStats, whatToFix } from './engine/themes.ts'
 import type { AppInfo, Review, VersionInfo } from './engine/types.ts'
-import { fetchReviews, lookupApp, type FetchProgress } from './live.ts'
+import { fetchReviews, lookupApp, looksLikeOutage, type FetchProgress } from './live.ts'
 import { blankProject, getData, getDefaults, getProject, putData, saveProject, uuid, type Project, type Snapshot } from './store.ts'
 
 const dataSubs = new Set<() => void>()
@@ -12,7 +12,9 @@ let dataTick = 0
 export const bumpData = () => { dataTick++; dataSubs.forEach(f => f()) }
 
 export async function getReviews(p: Project): Promise<Review[]> {
-  return p.sampleId ? sampleReviews(p.sampleId) : (await getData(p.id)) ?? []
+  if (p.sampleId) return sampleReviews(p.sampleId)
+  // Reviews stored before version labels were normalised can still say "v3.2".
+  return ((await getData(p.id)) ?? []).map(r => /^\s*v\d|\s$/i.test(r.version) ? { ...r, version: cleanVersion(r.version) } : r)
 }
 
 /** Reviews for a project, reloaded whenever data is written. null while loading. */
@@ -68,8 +70,9 @@ export async function runFetch(id: string, onProgress?: (label: string, p: Fetch
   const pages = getDefaults().pages
   const existing = await getReviews(p)
   let all = existing
-  let added = 0
+  let added = 0, updated = 0, outage = false
   const failed: string[] = []
+  const empty: string[] = []
   const apps: AppInfo[] = []
   for (const [i, a] of p.apps.entries()) {
     const fresh = await lookupApp(a.id, p.countries[0], signal).catch(() => null)
@@ -79,16 +82,21 @@ export async function runFetch(id: string, onProgress?: (label: string, p: Fetch
     // Competitors get fewer pages to keep the fetch quick.
     const res = await fetchReviews(app.id, p.countries, i === 0 ? pages : Math.min(pages, 4), pr => onProgress?.(app.name, pr), signal)
     failed.push(...res.failed.map(c => `${app.name} (${c.toUpperCase()})`))
+    if (looksLikeOutage(res, p.countries, app.ratingCount)) { if (i === 0) outage = true }
+    else if (i === 0) empty.push(...res.empty)
     const m = mergeReviews(all, res.reviews)
     all = m.reviews
     added += m.added
+    updated += m.updated
   }
   await putData(id, all)
-  p = { ...p, apps, lastFetch: Date.now() }
-  p.snapshots = [...p.snapshots, makeSnapshot(p, all, `Fetch ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`, Date.now())]
+  // A fetch that brought nothing during a feed outage is not a fetch: keep the last good time and history.
+  p = { ...p, apps, lastFetch: outage && !added ? p.lastFetch : Date.now() }
+  // History only gets a new entry when the review set changed.
+  if (added || updated || !p.snapshots.length && all.length) p.snapshots = [...p.snapshots, makeSnapshot(p, all, `Fetch ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`, Date.now())]
   await saveProject(p)
   bumpData()
-  return { added, total: all.length, failed }
+  return { added, updated, total: all.length, failed, empty, outage }
 }
 
 export function makeSnapshot(p: Project, reviews: Review[], label: string, at: number): Snapshot {
@@ -125,7 +133,7 @@ export function analyze(p: Project | undefined, reviews: Review[] | null, appId?
       themes: themeStats(rs, p.rules),
       themesOf: (r: Review) => themesOf.get(r) ?? classify(r, p.rules),
       emerging: latest ? emergingThemes(rs, p.rules, latest) : [],
-      clusters: clusters(rs),
+      clusters: clusters(rs, 8, 3, app.name),
       requests: groupRequests(featureRequests(rs)),
       fix: whatToFix(rs, p.rules, latest),
     }

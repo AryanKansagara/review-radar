@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { assignVersions, detectMapping, FIELDS, parseAscJson, parseCsv, parseVersions, rowsToReviews, type ImportResult, type Mapping } from './engine/importer.ts'
+import { assignVersions, detectMapping, FIELDS, jsonToRows, parseAscJson, parseCsv, parseFeedJson, parseVersions, rowsToReviews, type ImportResult, type Mapping } from './engine/importer.ts'
 import { COUNTRIES, mergeReviews } from './engine/reviews.ts'
 import type { VersionInfo } from './engine/types.ts'
-import type { FetchProgress } from './live.ts'
+import { OUTAGE_NOTE, type FetchProgress } from './live.ts'
 import { bumpData, getReviews, makeSnapshot, mergeVersions, runFetch } from './projectData.ts'
 import { getDefaults, getProject, putData, saveProject, update, uuid, type Project } from './store.ts'
 import { RAW_SYNC_LIMIT } from './sync.ts'
@@ -47,9 +47,11 @@ function FetchPanel({ p, auto }: { p: Project; auto: boolean }) {
     setBusy(true); setResult(null)
     try {
       const r = await runFetch(p.id, (label, pr) => setProg({ label, p: pr }), c.signal)
-      const msg = `Fetched ${plural(r.added, 'new review')} (${r.total.toLocaleString()} total).${r.failed.length ? ` No response for ${r.failed.join(', ')}.` : ''}`
+      const msg = r.outage
+        ? `${OUTAGE_NOTE} ${r.total ? `Your ${r.total.toLocaleString()} stored reviews are untouched.` : 'Nothing was saved.'} Try again later, or import a file below.`
+        : `Fetched ${plural(r.added, 'new review')}${r.updated ? `, ${r.updated} edited` : ''} (${r.total.toLocaleString()} total).${r.failed.length ? ` No response for ${r.failed.join(', ')}.` : ''}${r.empty.length ? ` No written reviews in ${r.empty.map(c => c.toUpperCase()).join(', ')}.` : ''}`
       setResult(msg)
-      toast(msg, { tone: r.failed.length ? undefined : 'ok' })
+      toast(msg, { tone: r.outage ? 'error' : r.failed.length ? undefined : 'ok' })
     } catch (e) {
       if (c.signal.aborted) { setResult('Fetch cancelled. Nothing was saved.'); return }
       const m = e instanceof Error ? e.message : String(e)
@@ -91,18 +93,20 @@ function ImportPanel({ p, startOpen }: { p: Project; startOpen: boolean }) {
   const appId = p.apps[0]?.id ?? 'imported'
   const country = p.countries[0] ?? 'us'
   const load = (text: string, fileName: string) => {
-    const asc = parseAscJson(text, appId)
-    if (asc) { setPending({ fileName, rows: null, map: {}, result: asc }); return }
-    const rows = parseCsv(text)
+    const whole = parseAscJson(text, appId) ?? parseFeedJson(text, appId, country)
+    if (whole) { setPending({ fileName, rows: null, map: {}, result: whole }); return }
+    const json = jsonToRows(text)
+    if (!json && /^\s*[[{]/.test(text)) { toast('That JSON is not a format Review Radar reads. Accepted: App Store Connect customerReviews, saved review feed pages, or an array of review objects.', { tone: 'error' }); return }
+    const rows = json ?? parseCsv(text)
     if (rows.length < 2) { toast('That file has no data rows. Expected a header row then one review per row.', { tone: 'error' }); return }
     const map = detectMapping(rows[0])
-    setPending({ fileName, rows, map, result: rowsToReviews(rows, map, appId, country) })
+    setPending({ fileName, rows, map, result: { ...rowsToReviews(rows, map, appId, country), format: json ? 'JSON array' : 'csv' } })
   }
   const remap = (f: keyof Mapping, i: number | undefined) => {
     if (!pending?.rows) return
     const map = { ...pending.map, [f]: i }
     if (i === undefined) delete map[f]
-    setPending({ ...pending, map, result: rowsToReviews(pending.rows, map, appId, country) })
+    setPending({ ...pending, map, result: { ...rowsToReviews(pending.rows, map, appId, country), format: pending.result.format } })
   }
   const commit = async () => {
     if (!pending) return
@@ -121,7 +125,7 @@ function ImportPanel({ p, startOpen }: { p: Project; startOpen: boolean }) {
   const blocking = !pending?.result.reviews.length
   return (
     <details className="card pad import" open={startOpen || !!pending}>
-      <summary><h2 className="h4 inline">Import reviews</h2> <span className="muted small">CSV, TSV or App Store Connect API JSON. For history older than the feed’s 500 most recent.</span></summary>
+      <summary><h2 className="h4 inline">Import reviews</h2> <span className="muted small">CSV, TSV or JSON (App Store Connect API, saved feed pages, scraper output). For history older than the feed’s 500 most recent.</span></summary>
       {!pending ? (
         <div className="stack-sm">
           <div className={`drop${drag ? ' on' : ''}`} onDragOver={e => { e.preventDefault(); setDrag(true) }} onDragLeave={() => setDrag(false)}

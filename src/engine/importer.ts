@@ -1,5 +1,5 @@
 // Import: CSV/TSV or App Store Connect API JSON -> detected columns -> reviews + a validation report.
-import { hashId } from './reviews.ts'
+import { cleanVersion, hashId, normalizeRss } from './reviews.ts'
 import type { Review, VersionInfo } from './types.ts'
 
 export function parseCsv(text: string): string[][] {
@@ -37,23 +37,28 @@ export const FIELDS: { f: Field; label: string; required?: boolean }[] = [
   { f: 'country', label: 'Country / territory' }, { f: 'author', label: 'Reviewer nickname' }, { f: 'id', label: 'Review id' },
 ]
 
+// Tested against the headers of the App Store Connect API, the app-store-scraper libraries (Python and Node),
+// Appfigures, AppFollow and Appbot exports. Headers are compared after headerKey().
 const ALIASES: Record<Field, RegExp> = {
-  id: /^(review ?id|id|customer ?review ?id)$/i,
-  date: /^(date|created ?date|review ?date|created|last ?modified|updated|submitted|time)/i,
-  rating: /^(rating|stars?|score|star ?rating)$/i,
-  title: /^(title|review ?title|subject|headline)$/i,
-  body: /^(body|review|content|text|review ?text|comment|review ?body|description)$/i,
-  version: /^(version|app ?version|build|version ?name)$/i,
-  country: /^(country|territory|store|storefront|country ?code|region|locale)$/i,
-  author: /^(author|reviewer|nickname|reviewer ?nickname|user ?name|name|user)$/i,
+  id: /^(review ?id|id|customer ?review ?id)$/,
+  date: /^(date|created ?date|review ?date|created|last ?modified|updated|submitted|submission ?date|time)/,
+  rating: /^(rating|stars?|score|star ?rating|im rating)$/,
+  title: /^(title|review ?title|subject|headline)$/,
+  body: /^(body|review|content|text|review ?text|comment|review ?body|description)$/,
+  version: /^(version|app ?version|build|version ?name|im version)$/,
+  country: /^(country|territory|store|storefront|country ?code|region|locale|iso)$/,
+  author: /^(author|reviewer|nickname|reviewer ?nickname|user ?name|name|user)$/,
 }
+
+/** "reviewerNickname", "review_id" and "Review-ID" all compare as lowercase words separated by spaces. */
+export const headerKey = (h: string) => h.trim().replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_\-:.]+/g, ' ').replace(/\s+/g, ' ').toLowerCase()
 
 export type Mapping = Partial<Record<Field, number>>
 
 export function detectMapping(header: string[]): Mapping {
   const m: Mapping = {}
   for (const { f } of FIELDS) {
-    const i = header.findIndex((h, j) => ALIASES[f].test(h.trim()) && !Object.values(m).includes(j))
+    const i = header.findIndex((h, j) => ALIASES[f].test(headerKey(h)) && !Object.values(m).includes(j))
     if (i >= 0) m[f] = i
   }
   return m
@@ -74,22 +79,48 @@ export function toCountry(s: string | undefined): string | null {
   return null
 }
 
-/** ISO date from "2026-10-03", "2026-10-03T12:00:00Z", "10/03/2026", "3 Oct 2026". Day-first if the first part is > 12. */
-export function toDate(s: string | undefined): string | null {
+/**
+ * ISO date from "2026-10-03", "2026-10-03 12:00:00", "2026-10-03T12:00:00Z", "10/03/2026", "3 Oct 2026" or a Unix timestamp.
+ * Timestamps without a zone are read as UTC so the same file imports the same way on every device.
+ * Slash dates are month first unless `dayFirst` is set or the first part is over 12.
+ */
+export function toDate(s: string | undefined, dayFirst = false): string | null {
   if (!s) return null
   const t = s.trim()
-  let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)
-  if (m) { const d = new Date(t.length > 10 ? t : `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}T00:00:00Z`); return isNaN(+d) ? null : d.toISOString() }
+  let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ](\d{1,2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?)?\s*(Z|[+-]\d{2}:?\d{2})?$/i)
+  if (m) {
+    const [y, mo, da] = [+m[1], +m[2], +m[3]]
+    if (mo < 1 || mo > 12 || da < 1 || da > 31) return null
+    const utc = Date.UTC(y, mo - 1, da, +(m[4] ?? 0), +(m[5] ?? 0), +(m[6] ?? 0))
+    const z = m[7] && m[7].toUpperCase() !== 'Z' ? m[7].match(/([+-])(\d{2}):?(\d{2})/)! : null
+    const off = z ? (z[1] === '-' ? -1 : 1) * (+z[2] * 60 + +z[3]) * 6e4 : 0
+    return new Date(utc - off).toISOString()
+  }
   m = t.match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{2,4})/)
   if (m) {
     let a = +m[1], b = +m[2]
-    if (a > 12) [a, b] = [b, a]
+    if (dayFirst || a > 12) [a, b] = [b, a]
     const y = m[3].length === 2 ? 2000 + +m[3] : +m[3]
     const d = new Date(Date.UTC(y, a - 1, b))
     return a >= 1 && a <= 12 && b >= 1 && b <= 31 && !isNaN(+d) ? d.toISOString() : null
   }
-  const d = new Date(t)
+  if (/^\d{10}$/.test(t)) return new Date(+t * 1000).toISOString()
+  if (/^\d{13}$/.test(t)) return new Date(+t).toISOString()
+  if (/^\d+$/.test(t)) return null
+  const d = new Date(/\d{4}/.test(t) && !/(Z|GMT|UTC|[+-]\d{2}:?\d{2})$/i.test(t) ? t + ' UTC' : t)
   return isNaN(+d) ? null : d.toISOString()
+}
+
+/** A slash-date column is day first when any row has a first part over 12 and no row has a second part over 12. */
+export function isDayFirst(values: string[]): boolean {
+  let first = false, second = false
+  for (const v of values) {
+    const m = v.trim().match(/^(\d{1,2})[/.](\d{1,2})[/.]\d{2,4}/)
+    if (!m) continue
+    if (+m[1] > 12) first = true
+    if (+m[2] > 12) second = true
+  }
+  return first && !second
 }
 
 export function rowsToReviews(rows: string[][], map: Mapping, appId: string, defaultCountry = 'us'): ImportResult {
@@ -100,10 +131,12 @@ export function rowsToReviews(rows: string[][], map: Mapping, appId: string, def
   for (const f of FIELDS) if (f.required && map[f.f] === undefined) issues.push({ line: 1, level: 'error', message: `No column mapped to ${f.label}.` })
   if (issues.length) return { reviews, issues, skipped: rows.length - 1, format: 'csv' }
   const get = (r: string[], f: Field) => map[f] === undefined ? '' : (r[map[f]!] ?? '').trim()
+  const dayFirst = isDayFirst(rows.slice(1).map(r => get(r, 'date')))
+  if (dayFirst) issues.push({ line: 1, level: 'warning', message: 'Dates read as day/month/year, because some rows have a day above 12.' })
   rows.slice(1).forEach((r, i) => {
     const line = i + 2
-    const date = toDate(get(r, 'date'))
-    const rating = Number(get(r, 'rating').replace(/[^\d.]/g, ''))
+    const date = toDate(get(r, 'date'), dayFirst)
+    const rating = Number(get(r, 'rating').replace(',', '.').replace(/[^\d.]/g, ''))
     const body = get(r, 'body')
     if (!date) { issues.push({ line, level: 'error', message: `Date "${get(r, 'date')}" is not a date. Row skipped.` }); skipped++; return }
     if (!(rating >= 1 && rating <= 5)) { issues.push({ line, level: 'error', message: `Rating "${get(r, 'rating')}" is not 1 to 5. Row skipped.` }); skipped++; return }
@@ -111,7 +144,7 @@ export function rowsToReviews(rows: string[][], map: Mapping, appId: string, def
     const cRaw = get(r, 'country')
     const country = toCountry(cRaw)
     if (cRaw && !country) issues.push({ line, level: 'warning', message: `Unknown country "${cRaw}", using ${defaultCountry.toUpperCase()}.` })
-    const version = get(r, 'version') || 'unknown'
+    const version = cleanVersion(get(r, 'version')) || 'unknown'
     const id = get(r, 'id') || hashId(`${date}|${rating}|${get(r, 'title')}|${body}`)
     if (seen.has(id)) { issues.push({ line, level: 'warning', message: 'Duplicate of an earlier row. Skipped.' }); skipped++; return }
     seen.add(id)
@@ -141,6 +174,44 @@ export function parseAscJson(text: string, appId: string): ImportResult | null {
   return { reviews, issues, skipped: data.length - reviews.length, format: 'App Store Connect API JSON' }
 }
 
+/** Saved pages of the public customer-reviews feed (one page or an array of pages), e.g. from curl or a web archive. */
+export function parseFeedJson(text: string, appId: string, defaultCountry = 'us'): ImportResult | null {
+  let j: unknown
+  try { j = JSON.parse(text) } catch { return null }
+  const pages = (Array.isArray(j) ? j : [j]).filter(p => p && typeof p === 'object' && 'feed' in (p as object))
+  if (!pages.length) return null
+  const seen = new Set<string>()
+  const reviews: Review[] = []
+  let dupes = 0
+  for (const p of pages) {
+    // The storefront is part of the feed's own address: https://itunes.apple.com/gb/rss/customerreviews/...
+    const self = JSON.stringify((p as { feed: { id?: unknown } }).feed.id ?? '')
+    const country = self.match(/apple\.com\/([a-z]{2})\/rss\//i)?.[1].toLowerCase() ?? defaultCountry
+    for (const r of normalizeRss(p, appId, country)) {
+      if (seen.has(r.id)) { dupes++; continue }
+      seen.add(r.id)
+      reviews.push({ ...r, source: 'import' })
+    }
+  }
+  const issues: Issue[] = []
+  if (!reviews.length) issues.push({ line: 1, level: 'error', message: 'This feed page lists no reviews. Apple’s feed sometimes answers with an empty list; save the page again later.' })
+  if (dupes) issues.push({ line: 1, level: 'warning', message: `${dupes} reviews appear on more than one page. Kept once.` })
+  return { reviews, issues, skipped: dupes, format: 'App Store reviews feed JSON' }
+}
+
+/**
+ * A JSON array of flat objects, such as the output of the app-store-scraper libraries
+ * ([{ id, userName, version, score, title, text, updated }, ...]), as header + rows for the CSV path.
+ */
+export function jsonToRows(text: string): string[][] | null {
+  let j: unknown
+  try { j = JSON.parse(text) } catch { return null }
+  if (!Array.isArray(j) || !j.length || !j.every(x => x && typeof x === 'object' && !Array.isArray(x))) return null
+  const keys = [...new Set((j as Record<string, unknown>[]).flatMap(o => Object.keys(o)))]
+  const cell = (v: unknown) => v === null || v === undefined ? '' : typeof v === 'object' ? '' : String(v)
+  return [keys, ...(j as Record<string, unknown>[]).map(o => keys.map(k => cell(o[k])))]
+}
+
 /** Version history: "version,date[,notes]" per line, with or without a header. */
 export function parseVersions(text: string): { versions: VersionInfo[]; issues: Issue[] } {
   const rows = parseCsv(text)
@@ -151,7 +222,7 @@ export function parseVersions(text: string): { versions: VersionInfo[]; issues: 
     const [v, d, ...notes] = r
     const date = toDate(d)
     if (!v || !date) { issues.push({ line: i + 1, level: 'error', message: `Expected "version,date", got "${r.join(',')}".` }); return }
-    versions.push({ version: v.replace(/^v/i, ''), date: date.slice(0, 10), notes: notes.join(', ') || undefined, origin: 'listed' })
+    versions.push({ version: cleanVersion(v), date: date.slice(0, 10), notes: notes.join(', ') || undefined, origin: 'listed' })
   })
   return { versions, issues }
 }
