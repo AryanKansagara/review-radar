@@ -55,7 +55,7 @@ export default function Report({ id }: { id: string }) {
         {worst.length > 0 && <section className="sheet-sec"><h2>In their words</h2>{worst.map(r => <blockquote key={r.id} className="quote"><b>{r.rating}★ {r.title}</b> {r.body} <span className="muted">· {countryName(r.country)}, {fmtDate(r.date)}</span></blockquote>)}</section>}
         {new Set(a.byCountry.map(c => c.country)).size > 1 && <section className="sheet-sec"><h2>By country</h2><CountryHeat cells={a.byCountry} versions={a.versions.map(x => x.version)} /></section>}
         {notes && <section className="sheet-sec"><h2>Proposed release notes</h2><pre className="notes-pre">{notes}</pre></section>}
-        <footer className="sheet-foot muted small">Ratings from public App Store reviews with written text (the feed returns the 500 most recent per country). Intervals are 95% bootstrap (means) and Wilson (shares). Review Radar, an independent tool not affiliated with Apple.</footer>
+        <footer className="sheet-foot muted small">Ratings from public App Store reviews with written text (the feed returns the 500 most recent per country). Intervals are 95% bootstrap (means) and Wilson (shares). Review Radar.</footer>
       </article>
     </div>
   )

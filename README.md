@@ -50,4 +50,4 @@ Cloud sync needs `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in `.en
 - Sentiment is English only. Themes cover seven languages; Korean, Dutch, Swedish and others need your own keywords.
 - Reply drafts are copied by hand into App Store Connect; nothing is posted for you.
 
-Built by Aryan Kansagara. Independent project, not affiliated with Apple Inc.
+Built by Aryan Kansagara.

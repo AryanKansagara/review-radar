@@ -289,7 +289,7 @@ export function Footer() {
       <div className="footer-inner">
         <div className="footer-brand"><Monogram /> <strong>Review Radar</strong></div>
         <nav className="footer-nav" aria-label="Footer"><Link href="/app">Projects</Link><Link href="/docs">Docs</Link><Link href="/settings">Settings</Link></nav>
-        <p>Built by Aryan Kansagara. Independent project, not affiliated with Apple Inc. App Store is a trademark of Apple Inc.</p>
+        <p>Built by Aryan Kansagara.</p>
         <p className="muted small">Sample apps are synthetic. Reviews come straight from the public App Store feeds to your browser and stay on this device unless you sign in to sync.</p>
       </div>
     </footer>
