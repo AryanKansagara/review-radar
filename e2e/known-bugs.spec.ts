@@ -61,7 +61,7 @@ test.fail('#5 App Store Connect territories outside the 21 in the table are not 
   await expect(page.locator('table.preview tbody td:nth-child(4)')).toHaveText(['CH', 'AT', 'PL'])
 })
 
-test.fail('#6 nothing is called emerging when there is no earlier version', async ({ page }) => {
+test('#6 nothing is called emerging when there is no earlier version', async ({ page }) => {
   await importProject(page)
   await importFile(page, 'one.csv', 'date,rating,review,version\n' + Array.from({ length: 10 }, (_, i) => `2026-10-01,${i < 5 ? 1 : 5},${i < 5 ? 'It crashes' : 'Fine'} ${i},1.0`).join('\n'), 10)
   await tab(page, 'Actions')
