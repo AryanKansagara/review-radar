@@ -65,7 +65,7 @@ export default function Docs() {
         <li><b>Term clusters:</b> unigrams and bigrams from 1 to 3 star reviews, scored by summed TF-IDF, grouped greedily so each review lands in one cluster. Common function words in English, German, French, Spanish, Portuguese and Italian and the app’s own name are left out. Catches complaints the rules miss.</li>
         <li><b>Feature requests:</b> sentences matching “please add”, “I wish”, “would be great if”, “bring back” and similar, grouped by their most shared term.</li>
         <li><b>What to fix next:</b> mentions × stars lost × (1 + 4 × growth in the latest version). Feature requests are listed separately.</li>
-        <li><b>Sentiment:</b> a small lexicon in the AFINN style (integer word scores from −5 to +5, negation within two words, normalised by √length). The word list was written for this project and is MIT licensed with the code; it is English only and scores other languages as neutral. It is a secondary signal used to spot reviews whose text disagrees with their stars.</li>
+        <li><b>Sentiment:</b> a small lexicon in the AFINN style (integer word scores from −5 to +5, negation within two words of the same clause, normalised by √length). The word list was written for this project and is MIT licensed with the code; it is English only and scores other languages as neutral. It is a secondary signal used to spot reviews whose text disagrees with their stars.</li>
       </ul>
 
       <h2 id="replies">Replies</h2>
