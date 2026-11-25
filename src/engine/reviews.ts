@@ -128,6 +128,27 @@ function matchByContent(stored: Map<string, Review>, incoming: Review[]): Map<Re
   return out
 }
 
+/**
+ * A stored review and another reading of it. A newer edit, or a file with the same date (a corrected mapping), replaces it;
+ * an older one only fills what is not known. What the new reading does not say never erases what is stored.
+ */
+function combine(old: Review, r: Review): Review {
+  const next = r.date >= old.date ? { ...r, id: old.id } : { ...old }
+  const [first, second] = r.date >= old.date ? [r, old] : [old, r]
+  next.title = first.title || second.title
+  next.body = first.body || second.body
+  next.author = first.author || second.author
+  next.version = version(first) || version(second) || 'unknown'
+  // A review belongs to one storefront: a fetch that meets it again in another never moves it.
+  const c = r.source === 'import' ? [first, second] : [old, r]
+  const known = c.find(country)
+  next.country = (known ?? old).country
+  if (known) delete next.countryAssumed
+  else next.countryAssumed = true
+  const changed = r.date > old.date || (['rating', 'title', 'body', 'author', 'version', 'country', 'countryAssumed'] as const).some(f => next[f] !== old[f])
+  return changed ? next : old
+}
+
 /** Merges fetched or imported reviews into the stored set. Same id: the newer edit wins (reviewers can update a review). */
 export function mergeReviews(existing: Review[], incoming: Review[]): { reviews: Review[]; added: number; updated: number } {
   const map = new Map(existing.map(r => [key(r), r]))
@@ -136,8 +157,9 @@ export function mergeReviews(existing: Review[], incoming: Review[]): { reviews:
   for (const r of incoming) {
     const k = matched.get(r) ?? key(r)
     const old = map.get(k)
-    if (!old) { map.set(k, r); added++ }
-    else if (r.date > old.date || (r.date === old.date && (r.body !== old.body || r.rating !== old.rating))) { map.set(k, r); updated++ }
+    if (!old) { map.set(k, r); added++; continue }
+    const next = combine(old, r)
+    if (next !== old) { map.set(k, next); updated++ }
   }
   const reviews = [...map.values()].sort((a, b) => b.date.localeCompare(a.date))
   return { reviews, added, updated }
