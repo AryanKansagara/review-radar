@@ -3,8 +3,8 @@
 // AFINN approach (Nielsen 2011: integer valence from -5 to +5, summed and normalised) but
 // no entries are copied from AFINN, whose own list is distributed under the ODbL.
 
-const L: Record<string, number> = {}
-const add = (score: number, words: string) => { for (const w of words.split(' ')) L[w] = score }
+const L = new Map<string, number>()
+const add = (score: number, words: string) => { for (const w of words.split(' ')) L.set(w, score) }
 add(5, 'amazing awesome brilliant excellent fantastic flawless incredible outstanding perfect superb wonderful')
 add(4, 'beautiful delightful favorite favourite gorgeous lifesaver love loved loving masterpiece')
 add(3, 'best enjoy enjoyed fabulous fun great happy helpful impressed intuitive lovely recommend recommended smooth solid')
@@ -18,18 +18,22 @@ add(-5, 'fraud')
 
 const NEG = new Set(['not', 'no', 'never', 'dont', 'doesnt', 'didnt', 'isnt', 'wasnt', 'cant', 'wont', 'hardly', 'without'])
 
+/** Where a clause ends: sentence marks, commas, colons, brackets, dashes between words and line breaks. Not the point in "3.2". */
+const CLAUSE = /[!?;:()[\]{}\n\r…—。！？，]|(?<!\d)[.,]|[.,](?!\d)|\s[-–]+\s/
+
 /**
- * Sum of word scores, with a negator within the two previous words flipping the sign
- * ("not great" counts as negative). Returns the sum and a -1..1 comparative score.
+ * Sum of word scores, with a negator within the two previous words of the same clause flipping the sign
+ * ("not great" counts as negative, "No complaints. Amazing" does not). Returns the sum and a -1..1 comparative score.
  */
 export function sentiment(text: string): { score: number; comparative: number; hits: string[] } {
-  const w = text.toLowerCase().replace(/[’']/g, '').replace(/[^a-z\s]/g, ' ').split(/\s+/).filter(Boolean)
+  const clauses = text.toLowerCase().replace(/[’']/g, '').split(CLAUSE).map(c => c.replace(/[^a-z\s]/g, ' ').split(/\s+/).filter(Boolean))
+  const w = clauses.flat()
   let score = 0
   const hits: string[] = []
-  w.forEach((x, i) => {
-    const v = L[x]
+  for (const c of clauses) c.forEach((x, i) => {
+    const v = L.get(x)
     if (!v) return
-    const flip = NEG.has(w[i - 1]) || NEG.has(w[i - 2])
+    const flip = NEG.has(c[i - 1]) || NEG.has(c[i - 2])
     score += flip ? -v : v
     hits.push(flip ? `not ${x}` : x)
   })

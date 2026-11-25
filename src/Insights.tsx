@@ -164,7 +164,7 @@ function Reviews({ p, a }: { p: Project; a: Analysis }) {
     (f.version === 'all' || r.version === f.version) &&
     (f.rating === 'all' || (f.rating === 'low' ? r.rating <= 2 : String(r.rating) === f.rating)) &&
     (f.theme === 'all' || (f.theme === 'none' ? !a.themesOf(r).length : a.themesOf(r).includes(f.theme))) &&
-    (f.status === 'all' || (f.status === 'todo' ? !p.replied.includes(r.id) && r.rating <= 3 : f.status === 'replied' ? p.replied.includes(r.id) : mismatch(r.rating, sentiment(r.title + ' ' + r.body).comparative))) &&
+    (f.status === 'all' || (f.status === 'todo' ? !p.replied.includes(r.id) && r.rating <= 3 : f.status === 'replied' ? p.replied.includes(r.id) : mismatch(r.rating, sentiment(`${r.title}\n${r.body}`).comparative))) &&
     (!f.q || (r.title + ' ' + r.body + ' ' + r.author).toLowerCase().includes(f.q.toLowerCase()))
   ), [a, f, p.replied])
   return (
@@ -190,7 +190,7 @@ function Reviews({ p, a }: { p: Project; a: Analysis }) {
 function ReviewItem({ r, p, a }: { r: Review; p: Project; a: Analysis }) {
   const [open, setOpen] = useState(false)
   const themes = a.themesOf(r)
-  const s = sentiment(`${r.title} ${r.body}`)
+  const s = sentiment(`${r.title}\n${r.body}`)
   const replied = p.replied.includes(r.id)
   const ctx = { appName: a.app.name, developer: a.app.developer, supportEmail: p.reply.supportEmail || 'support@yourapp.com', signature: p.reply.signature, fixedIn: p.reply.fixedIn || undefined }
   const [text, setText] = useState(() => draftReply(r, themes, ctx).text)

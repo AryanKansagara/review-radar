@@ -198,7 +198,7 @@ test('#14 a negative rating is not a rating', async ({ page }) => {
   await expect(ready(page)).toContainText('1 review ready, 1 skipped')
 })
 
-test.fail('#15 a negation stops at the end of its clause', async ({ page }) => {
+test('#15 a negation stops at the end of its clause', async ({ page }) => {
   await importProject(page)
   await importFile(page, 's.csv', 'date,rating,review\n2026-10-01,5,No complaints. Amazing\n2026-10-02,5,The constructor is great', 2)
   await tab(page, 'Reviews')
