@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { assignVersions } from './engine/importer.ts'
 import { buildVersions, cleanVersion, cmpVersion, mergeReviews } from './engine/reviews.ts'
 import { SAMPLES, sampleReviews } from './engine/sample.ts'
 import { releaseImpact, seriesByVersion, summarize, versionByCountry, weekly } from './engine/stats.ts'
@@ -104,11 +105,14 @@ export async function runFetch(id: string, onProgress?: (label: string, p: Fetch
     added += m.added
     updated += m.updated
   }
+  const listed = (p: Project) => Object.fromEntries(Object.entries(p.versions).concat(
+    p.apps.flatMap(a => fetched.has(a.id) ? [[a.id, mergeVersions(p.versions[a.id] ?? [], lookupVersion(fetched.get(a.id)!.app))]] : [])))
+  // The lookup can add a release, which moves the reviews that were dated by the list.
+  for (const [a, vs] of Object.entries(listed(cur))) all = assignVersions(all, vs, a)
   await putData(id, all)
   cur = getProject(id)
   if (!cur) { await delData(id); return gone }
-  const versions = { ...cur.versions }
-  for (const a of cur.apps) if (fetched.has(a.id)) versions[a.id] = mergeVersions(versions[a.id] ?? [], lookupVersion(fetched.get(a.id)!.app))
+  const versions = listed(cur)
   // A fetch that brought nothing during a feed outage is not a fetch: keep the last good time and history.
   const p = { ...cur, versions, apps: cur.apps.map(a => fetched.get(a.id)?.app ?? a), lastFetch: outage && !added ? cur.lastFetch : Date.now() }
   // History only gets a new entry when the review set changed.

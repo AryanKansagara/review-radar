@@ -250,7 +250,7 @@ test('version list parsing and assignment by date', () => {
   assert.equal(versions.length, 2)
   assert.equal(versions[0].version, '1.0')
   assert.equal(issues[0].line, 4)
-  const out = assignVersions([rv({ version: 'unknown', date: '2026-01-15T00:00:00Z' }), rv({ version: 'unknown', date: '2026-03-01T00:00:00Z' }), rv({ version: 'unknown', date: '2025-12-01T00:00:00Z' }), rv({ version: '9' })], versions)
+  const out = assignVersions([rv({ version: 'unknown', date: '2026-01-15T00:00:00Z' }), rv({ version: 'unknown', date: '2026-03-01T00:00:00Z' }), rv({ version: 'unknown', date: '2025-12-01T00:00:00Z' }), rv({ version: '9' })], versions, '1')
   assert.deepEqual(out.map(r => r.version), ['1.0', '1.1', 'unknown', '9'])
 })
 

@@ -110,7 +110,7 @@ export const isRoundedId = (id: string) => /^[+-]?\d+(?:[.,]\d+)?e[+-]\d+$/i.tes
 const isOwnId = (id: string) => isContentId(id) || isRoundedId(id) || /^h[0-9a-z]{1,7}$/.test(id)
 
 const country = (r: Review) => r.countryAssumed ? '' : r.country
-const version = (r: Review) => r.version === 'unknown' ? '' : r.version
+const version = (r: Review) => r.version === 'unknown' || r.versionInferred ? '' : r.version
 const same = (a: string, b: string) => a === b
 const fits = (a: string, b: string) => !a || !b || a === b
 const agree = (a: Review, b: Review, eq: (x: string, y: string) => boolean) => eq(a.author, b.author) && eq(country(a), country(b)) && eq(version(a), version(b))
@@ -145,14 +145,17 @@ function combine(old: Review, r: Review): Review {
   next.title = first.title || second.title
   next.body = first.body || second.body
   next.author = first.author || second.author
-  next.version = version(first) || version(second) || 'unknown'
+  const from = version(first) ? first : version(second) ? second : old
+  next.version = from.version
+  if (from.versionInferred) next.versionInferred = true
+  else delete next.versionInferred
   // A review belongs to one storefront: a fetch that meets it again in another never moves it.
   const c = r.source === 'import' ? [first, second] : [old, r]
   const known = c.find(country)
   next.country = (known ?? old).country
   if (known) delete next.countryAssumed
   else next.countryAssumed = true
-  const changed = r.date > old.date || (['rating', 'title', 'body', 'author', 'version', 'country', 'countryAssumed'] as const).some(f => next[f] !== old[f])
+  const changed = r.date > old.date || (['rating', 'title', 'body', 'author', 'version', 'versionInferred', 'country', 'countryAssumed'] as const).some(f => next[f] !== old[f])
   return changed ? next : old
 }
 

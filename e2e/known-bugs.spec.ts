@@ -183,7 +183,7 @@ test('#12 numbers and single letters in a keyword phrase have to match', async (
   await expect(row(card(page, /^Themes$/), 'Missing feature')).toHaveCount(0)
 })
 
-test.fail('#13 a longer version list reassigns reviews that were dated by the shorter one', async ({ page }) => {
+test('#13 a longer version list reassigns reviews that were dated by the shorter one', async ({ page }) => {
   await importProject(page)
   await importFile(page, 'n.csv', 'date,rating,review\n2026-06-10,5,a\n2026-08-30,1,b', 2)
   await saveVersions(page, '3.0,2026-06-01')

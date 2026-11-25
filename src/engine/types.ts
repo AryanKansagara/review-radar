@@ -7,6 +7,8 @@ export interface Review {
   countryAssumed?: true
   rating: number
   version: string
+  /** Not from the review: the listed version that was out on its date. */
+  versionInferred?: true
   title: string
   body: string
   author: string

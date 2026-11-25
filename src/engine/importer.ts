@@ -318,16 +318,20 @@ export function parseVersions(text: string): { versions: VersionInfo[]; issues: 
   return { versions, issues }
 }
 
-/** Reviews without a version get the latest listed version released on or before their date. */
-export function assignVersions(reviews: Review[], versions: VersionInfo[]): Review[] {
+/**
+ * Reviews of the app that came without a version get the latest listed version released on or before their date.
+ * That is redone whenever the list changes; a version that came with the review is never touched.
+ */
+export function assignVersions(reviews: Review[], versions: VersionInfo[], appId: string): Review[] {
   const vs = [...versions].sort((a, b) => a.date.localeCompare(b.date))
   if (!vs.length) return reviews
   return reviews.map(r => {
-    if (r.version !== 'unknown') return r
+    if (r.appId !== appId || (r.version !== 'unknown' && !r.versionInferred)) return r
     const d = r.date.slice(0, 10)
-    let v: VersionInfo | undefined
-    for (const x of vs) if (x.date <= d) v = x
-    return v ? { ...r, version: v.version } : r
+    const v = vs.findLast(x => x.date <= d)?.version ?? 'unknown'
+    if (v === r.version) return r
+    const { versionInferred: _, ...rest } = r
+    return v === 'unknown' ? { ...rest, version: v } : { ...rest, version: v, versionInferred: true }
   })
 }
 

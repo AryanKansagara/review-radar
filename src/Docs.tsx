@@ -54,7 +54,7 @@ export default function Docs() {
       <p>The validation report lists every problem with its line number. Timestamps without a time zone are read as UTC. Dates such as <code>10/03/2026</code> (or with dots or dashes) are month first, unless some row in the column has a day above 12, in which case the whole column is read day first and the report says so; version lists follow the same rule. Days that do not exist, unreadable dates and ratings that are not a whole number from 1 to 5 skip the row; unknown countries and empty text are warnings. Duplicate ids are skipped, and re-importing the same file adds nothing. Importing again with a corrected mapping updates the stored reviews; a column the new file lacks keeps its stored values. Rows without an id, or with one a spreadsheet rounded (<code>1.47667E+10</code>), are duplicates only when date, rating, title, text, nickname, country and version are all the same.</p>
 
       <h2 id="versions">Version lists</h2>
-      <p>Optional but useful: one line per release, <code>version,date[,notes]</code>. App Store Connect → your app → App Store → version history has the dates. Listed dates replace dates inferred from the first review on that version.</p>
+      <p>Optional but useful: one line per release, <code>version,date[,notes]</code>. App Store Connect → your app → App Store → version history has the dates. Listed dates replace dates inferred from the first review on that version. Reviews without a version of their own get the listed version that was out on their date, again each time the list changes.</p>
       <Code label="CSV" code={VERSIONS} />
 
       <h2 id="methods">Methods</h2>
