@@ -192,7 +192,7 @@ test.fail('#13 a longer version list reassigns reviews that were dated by the sh
   await expect(row(card(page, 'Release impact'), '3.2').nth(2)).toHaveText('1.00')
 })
 
-test.fail('#14 a negative rating is not a rating', async ({ page }) => {
+test('#14 a negative rating is not a rating', async ({ page }) => {
   await importProject(page)
   await upload(page, 'r.csv', 'date,rating,review\n2026-10-01,-3,a\n2026-10-01,5,b')
   await expect(ready(page)).toContainText('1 review ready, 1 skipped')

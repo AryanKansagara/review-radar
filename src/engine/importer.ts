@@ -1,5 +1,5 @@
 // Import: CSV/TSV or App Store Connect API JSON -> detected columns -> reviews + a validation report.
-import { cleanVersion, contentId, hashId, isRoundedId, normalizeRss } from './reviews.ts'
+import { cleanVersion, contentId, hashId, isRoundedId, normalizeRss, readRating } from './reviews.ts'
 import type { Review, VersionInfo } from './types.ts'
 
 export interface CsvText {
@@ -205,10 +205,10 @@ export function rowsToReviews(rows: string[][], map: Mapping, appId: string, def
     // A comma in unquoted text moves every later cell one column on, so nothing after it can be trusted.
     if (r.slice(rows[0].length).some(Boolean)) { issues.push({ line, level: 'error', message: `${r.length} cells for ${rows[0].length} columns. Text that contains the separator must be in quotes. Row skipped.` }); skipped++; return }
     const date = toDate(get(r, 'date'), dayFirst)
-    const rating = Number(get(r, 'rating').replace(',', '.').replace(/[^\d.]/g, ''))
+    const rating = readRating(get(r, 'rating'))
     const body = get(r, 'body')
     if (!date) { issues.push({ line, level: 'error', message: `Date "${get(r, 'date')}" is not a date. Row skipped.` }); skipped++; return }
-    if (!(rating >= 1 && rating <= 5)) { issues.push({ line, level: 'error', message: `Rating "${get(r, 'rating')}" is not 1 to 5. Row skipped.` }); skipped++; return }
+    if (!rating) { issues.push({ line, level: 'error', message: `Rating "${get(r, 'rating')}" is not ${/^[1-5][.,]\d+$/.test(get(r, 'rating')) ? 'a whole number of stars' : '1 to 5'}. Row skipped.` }); skipped++; return }
     if (!body && !get(r, 'title')) { issues.push({ line, level: 'warning', message: 'Empty review text. Kept for rating statistics only.' }) }
     const cRaw = get(r, 'country')
     const country = toCountry(cRaw)
@@ -220,7 +220,7 @@ export function rowsToReviews(rows: string[][], map: Mapping, appId: string, def
     if (seen.has(id)) { issues.push({ line, level: 'warning', message: 'Duplicate of an earlier row. Skipped.' }); skipped++; return }
     seen.add(id)
     if (Object.values(map).some(c => c >= r.length)) issues.push({ line, level: 'warning', message: `Only ${r.length} of ${rows[0].length} cells. Kept, but the row may be cut off.` })
-    reviews.push({ id, appId, country: country ?? defaultCountry, ...(country ? {} : { countryAssumed: true as const }), rating: Math.round(rating), version, title: get(r, 'title'), body, author: get(r, 'author'), date, source: 'import' })
+    reviews.push({ id, appId, country: country ?? defaultCountry, ...(country ? {} : { countryAssumed: true as const }), rating, version, title: get(r, 'title'), body, author: get(r, 'author'), date, source: 'import' })
   })
   if (src.openQuote) { issues.push(notClosed(src.openQuote)); skipped++ }
   if (roundedAt) issues.push({ line: roundedAt, level: 'warning', message: 'Ids such as 1.47667E+10 were rounded by a spreadsheet and are not used. Rows are told apart by their content instead.' })
@@ -240,8 +240,8 @@ export function parseAscJson(text: string, appId: string, defaultCountry = 'us')
   data.forEach((d, i) => {
     const a = (d as { attributes?: Record<string, unknown> }).attributes ?? {}
     const date = toDate(String(a.createdDate ?? ''))
-    const rating = Number(a.rating)
-    if (!date || !(rating >= 1 && rating <= 5)) { issues.push({ line: i + 1, level: 'error', message: `Review ${i + 1} has no valid date or rating. Skipped.` }); return }
+    const rating = readRating(a.rating)
+    if (!date || !rating) { issues.push({ line: i + 1, level: 'error', message: `Review ${i + 1} has no valid date or rating. Skipped.` }); return }
     const country = toCountry(String(a.territory ?? ''))
     if (!country) issues.push({ line: i + 1, level: 'warning', message: `Review ${i + 1}: ${a.territory ? `unknown territory "${a.territory}"` : 'no territory'}, using ${defaultCountry.toUpperCase()}.` })
     reviews.push({ id: String((d as { id?: string }).id ?? hashId(JSON.stringify(a))), appId, country: country ?? defaultCountry, ...(country ? {} : { countryAssumed: true as const }), rating, version: 'unknown', title: String(a.title ?? ''), body: String(a.body ?? ''), author: String(a.reviewerNickname ?? ''), date, source: 'import' })
