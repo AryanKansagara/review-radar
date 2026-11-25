@@ -158,7 +158,7 @@ test('#7 a project that already lost its imported reviews this way shows them ag
   await expect(row(page.locator('table.compare'), 'Average rating')).toHaveText(['1.00', 'n/a'])
 })
 
-for (const data of ['{"feed":null}', '{"data":[null]}', '{"feed":{"entry":[null]}}']) test.fail(`#10 odd JSON gets an answer: ${data}`, async ({ page }) => {
+for (const data of ['{"feed":null}', '{"data":[null]}', '{"feed":{"entry":[null]}}']) test(`#10 odd JSON gets an answer: ${data}`, async ({ page }) => {
   await importProject(page)
   await upload(page, 'x.json', data)
   await expect(page.locator('.toast.error, .validation.has-errors').first()).toBeVisible()
