@@ -235,7 +235,7 @@ const FIXED: Record<string, string> = {
   'update-bug': 'Fixed issues introduced in the last update',
 }
 
-/** "Fixed: ..." lines for the themes the user marks as addressed. */
+/** "Fixed: ..." lines for the themes the user marks as addressed. `countries` are those the complaints came from; a single one is named. */
 export function releaseNotes(items: { id: string; label: string }[], countries: string[] = []): string {
   const lines = items.map(i => `• ${FIXED[i.id] ?? `Fixed: ${i.label.toLowerCase()} issues reported in reviews`}`)
   if (!lines.length) return ''

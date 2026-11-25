@@ -206,13 +206,19 @@ test('#15 a negation stops at the end of its clause', async ({ page }) => {
   await expect(page.locator('.review').filter({ hasText: 'constructor' })).not.toContainText('NaN')
 })
 
-test.fail('#16 release notes thank the storefront the complaints came from', async ({ page }) => {
+test('#16 release notes thank the storefront the complaints came from', async ({ page }) => {
   await importProject(page)
   await importFile(page, 'c.csv', 'date,rating,review,version,country\n2026-10-01,1,it crashes,1.0,de\n2026-10-02,5,fine,1.0,us', 2)
   await tab(page, 'Actions')
   await page.locator('.fix-list input').first().click()
   await expect(page.locator('.notes-pre')).toContainText('Fixed a crash')
   await expect(page.locator('.notes-pre')).not.toContainText('review in US')
+  await expect(page.locator('.notes-pre')).toContainText('review in DE')
+  // Complaints from two countries: none is named.
+  await tab(page, 'Data')
+  await importFile(page, 'd.csv', 'date,rating,review,version,country\n2026-10-03,2,it crashes too,1.0,fr', 1)
+  await tab(page, 'Actions')
+  await expect(page.locator('.notes-pre')).toContainText('Thank you for every review.')
 })
 
 test('#3 a replied mark and a removed competitor survive a fetch', async ({ page }) => {
