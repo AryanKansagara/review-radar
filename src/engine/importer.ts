@@ -1,5 +1,5 @@
 // Import: CSV/TSV or App Store Connect API JSON -> detected columns -> reviews + a validation report.
-import { cleanVersion, hashId, normalizeRss } from './reviews.ts'
+import { cleanVersion, contentId, hashId, isRoundedId, normalizeRss } from './reviews.ts'
 import type { Review, VersionInfo } from './types.ts'
 
 export interface CsvText {
@@ -160,7 +160,7 @@ export function rowsToReviews(rows: string[][], map: Mapping, appId: string, def
   const issues: Issue[] = []
   const reviews: Review[] = []
   const seen = new Set<string>()
-  let skipped = 0
+  let skipped = 0, roundedAt = 0
   for (const f of FIELDS) if (f.required && map[f.f] === undefined) issues.push({ line: 1, level: 'error', message: `No column mapped to ${f.label}.` })
   if (issues.length) return { reviews, issues, skipped: rows.length - 1, format: 'csv' }
   const get = (r: string[], f: Field) => map[f] === undefined ? '' : (r[map[f]!] ?? '').trim()
@@ -180,13 +180,16 @@ export function rowsToReviews(rows: string[][], map: Mapping, appId: string, def
     const country = toCountry(cRaw)
     if (cRaw && !country) issues.push({ line, level: 'warning', message: `Unknown country "${cRaw}", using ${defaultCountry.toUpperCase()}.` })
     const version = cleanVersion(get(r, 'version')) || 'unknown'
-    const id = get(r, 'id') || hashId(`${date}|${rating}|${get(r, 'title')}|${body}`)
+    const rounded = isRoundedId(get(r, 'id'))
+    if (rounded && !roundedAt) roundedAt = line
+    const id = get(r, 'id') && !rounded ? get(r, 'id') : contentId(JSON.stringify([date, rating, get(r, 'title'), body, get(r, 'author'), country ?? '', version]))
     if (seen.has(id)) { issues.push({ line, level: 'warning', message: 'Duplicate of an earlier row. Skipped.' }); skipped++; return }
     seen.add(id)
     if (Object.values(map).some(c => c >= r.length)) issues.push({ line, level: 'warning', message: `Only ${r.length} of ${rows[0].length} cells. Kept, but the row may be cut off.` })
-    reviews.push({ id, appId, country: country ?? defaultCountry, rating: Math.round(rating), version, title: get(r, 'title'), body, author: get(r, 'author'), date, source: 'import' })
+    reviews.push({ id, appId, country: country ?? defaultCountry, ...(country ? {} : { countryAssumed: true as const }), rating: Math.round(rating), version, title: get(r, 'title'), body, author: get(r, 'author'), date, source: 'import' })
   })
   if (src.openQuote) { issues.push(notClosed(src.openQuote)); skipped++ }
+  if (roundedAt) issues.push({ line: roundedAt, level: 'warning', message: 'Ids such as 1.47667E+10 were rounded by a spreadsheet and are not used. Rows are told apart by their content instead.' })
   if (reviews.length && reviews.every(r => r.version === 'unknown')) issues.push({ line: 1, level: 'warning', message: 'No version column. Release impact needs versions; add a version history list to assign reviews by date.' })
   return { reviews, issues, skipped, format: 'csv' }
 }

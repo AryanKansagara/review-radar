@@ -3,6 +3,8 @@ export interface Review {
   id: string
   appId: string
   country: string
+  /** The file named no country, so `country` is the project's default. */
+  countryAssumed?: true
   rating: number
   version: string
   title: string

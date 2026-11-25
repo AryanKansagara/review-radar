@@ -249,13 +249,13 @@ test.fail('#17 a signed-out user can export everything from the account menu', a
   await expect(page.getByRole('button', { name: 'Export all my data (JSON)' })).toBeVisible()
 })
 
-test.fail('#18 two people who wrote the same short review both count', async ({ page }) => {
+test('#18 two people who wrote the same short review both count', async ({ page }) => {
   await importProject(page)
   await upload(page, 'd.csv', 'date,rating,review,nickname,country\n2026-10-01,5,Great,amy,us\n2026-10-01,5,Great,bob,gb')
   await expect(ready(page)).toContainText('2 reviews ready')
 })
 
-test.fail('#18 ids a spreadsheet rounded do not make different reviews duplicates', async ({ page }) => {
+test('#18 ids a spreadsheet rounded do not make different reviews duplicates', async ({ page }) => {
   await importProject(page)
   await upload(page, 'd.csv', 'id,date,rating,review\n1.47667E+10,2026-10-01,5,First\n1.47667E+10,2026-10-02,1,Second')
   await expect(ready(page)).toContainText('2 reviews ready')
