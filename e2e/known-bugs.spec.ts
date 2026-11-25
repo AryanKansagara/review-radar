@@ -101,8 +101,8 @@ test.fail('#9 dates: a day that does not exist and a day-first version list', as
   await expect(panel.locator('.versions')).toContainText('Aug 5, 2026')
 })
 
-test.fail('#7 adding a competitor to imported reviews keeps them', async ({ page }) => {
-  await store(page, () => feedPage(many(2)), [APP, RIVAL])
+test('#7 adding a competitor to imported reviews keeps them', async ({ page }) => {
+  const asked = await store(page, () => feedPage(many(2)), [APP, RIVAL])
   await importProject(page)
   await importFile(page, 'own.csv', 'date,rating,review,version\n2026-09-01,1,mine,1.0\n2026-09-02,3,mine too,1.0', 2)
   await tab(page, 'Compare')
@@ -111,6 +111,44 @@ test.fail('#7 adding a competitor to imported reviews keeps them', async ({ page
   await page.getByRole('button', { name: /Rival Notes/ }).click()
   await tab(page, 'Reviews')
   await expect(page.locator('.review')).toHaveCount(2)
+  // The rival is a competitor: fetched, compared, removable. Only it is asked for at Apple.
+  await tab(page, 'Data')
+  await page.getByRole('button', { name: 'Fetch latest reviews' }).click()
+  await expect(page.getByText('Fetched 2 new reviews (4 total).').first()).toBeVisible()
+  expect(asked.length).toBeGreaterThan(0)
+  expect(asked.join()).not.toContain('imported')
+  await page.reload()
+  await tab(page, 'Compare')
+  await expect(row(page.locator('table.compare'), 'Average rating')).toHaveText(['2.00', '5.00'])
+  await page.getByRole('button', { name: 'Remove Rival Notes' }).click()
+  await expect(page.getByText('No competitors yet')).toBeVisible()
+  await tab(page, 'Reviews')
+  await expect(page.locator('.review')).toHaveCount(2)
+  // A later import joins the same reviews.
+  await tab(page, 'Data')
+  await upload(page, 'more.csv', 'date,rating,review,version\n2026-09-03,5,third,1.0')
+  await page.getByRole('button', { name: 'Import 1 review' }).click()
+  await expect(page.getByText('Imported 1 new review.')).toBeVisible()
+  await tab(page, 'Reviews')
+  await expect(page.locator('.review')).toHaveCount(3)
+})
+
+test('#7 a project that already lost its imported reviews this way shows them again', async ({ page }) => {
+  await store(page, () => feedPage(many(2)), [APP, RIVAL])
+  const path = await importProject(page)
+  await importFile(page, 'own.csv', 'date,rating,review,version\n2026-09-01,1,mine,1.0', 1)
+  await page.evaluate(([id, rival]) => new Promise<void>((res, rej) => {
+    const open = indexedDB.open('review-radar')
+    open.onsuccess = () => {
+      const s = open.result.transaction('projects', 'readwrite').objectStore('projects')
+      const get = s.get(id as string)
+      get.onsuccess = () => { const put = s.put({ ...get.result, apps: [rival] }); put.onsuccess = () => res(); put.onerror = () => rej(put.error) }
+    }
+  }), [path.split('/').pop()!, { id: '987654321', name: 'Rival Notes', developer: 'Other', icon: '', genre: '', version: '2.0', releaseNotes: '', currentVersionReleaseDate: '', rating: null, ratingCount: null, currentVersionRating: null, currentVersionRatingCount: null, url: '' }] as const)
+  await page.goto(path + '/reviews')
+  await expect(page.locator('.review')).toHaveCount(1)
+  await tab(page, 'Compare')
+  await expect(row(page.locator('table.compare'), 'Average rating')).toHaveText(['1.00', 'n/a'])
 })
 
 for (const data of ['{"feed":null}', '{"data":[null]}', '{"feed":{"entry":[null]}}']) test.fail(`#10 odd JSON gets an answer: ${data}`, async ({ page }) => {

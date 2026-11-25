@@ -3,7 +3,7 @@ import { parseAppRef } from './engine/reviews.ts'
 import { SAMPLES } from './engine/sample.ts'
 import type { AppInfo } from './engine/types.ts'
 import { lookupApp, searchApps } from './live.ts'
-import { createAppProject, createSampleProject } from './projectData.ts'
+import { createAppProject, createSampleProject, isStoreApp } from './projectData.ts'
 import { blankProject, deleteProject, saveProject, useProjects } from './store.ts'
 import { Empty, fmtDate, go, Link, Modal, Stars, SyntheticBadge, toast } from './ui.tsx'
 
@@ -117,7 +117,7 @@ export default function Workspace() {
                 <Link href={`/app/p/${p.id}`} className="proj-link">
                   <div className="row gap-sm">
                     {a?.icon ? <img src={a.icon} alt="" width="48" height="48" className="app-icon" /> : <span className="app-icon ph lg">{(a?.name ?? p.name)[0]}</span>}
-                    <div className="grow"><h3>{p.name} {p.sampleId && <SyntheticBadge />}</h3><p className="muted small">{a ? `${a.developer} · v${a.version}` : 'No app yet'}{p.apps.length > 1 ? ` · ${p.apps.length - 1} competitor${p.apps.length > 2 ? 's' : ''}` : ''}</p></div>
+                    <div className="grow"><h3>{p.name} {p.sampleId && <SyntheticBadge />}</h3><p className="muted small">{a ? isStoreApp(a) ? `${a.developer} · v${a.version}` : a.developer : 'No app yet'}{p.apps.length > 1 ? ` · ${p.apps.length - 1} competitor${p.apps.length > 2 ? 's' : ''}` : ''}</p></div>
                   </div>
                   <div className="proj-meta">
                     {last ? <><span><Stars value={last.mean} size={12} /> {last.mean.toFixed(2)}</span><span>{last.n.toLocaleString()} reviews</span><span>latest {last.latest ?? 'n/a'}</span></> : <span>Not fetched yet</span>}
