@@ -215,6 +215,8 @@ function AccountMenu() {
     try { await f(); if (ok) toast(ok, { tone: 'ok' }) } catch (e) { setErr(e instanceof Error ? e.message : String(e)) } finally { setBusy(false) }
   }
 
+  const exportButton = <button type="button" className="btn ghost sm block" disabled={busy} onClick={() => void run(async () => download(`review-radar-export-${new Date().toISOString().slice(0, 10)}.json`, await exportAll()))}>Export all my data (JSON)</button>
+
   return (
     <div className="account" ref={wrap}>
       <button type="button" className={`icon-btn avatar${s.user ? ' on' : ''}`} aria-expanded={open} aria-haspopup="true" aria-label={s.user ? `Account: ${s.user.email}` : 'Sign in to sync'} onClick={() => setOpen(o => !o)}>
@@ -237,13 +239,15 @@ function AccountMenu() {
               {err && <p className="error small" role="alert">{err}</p>}
               <button className="btn primary block" disabled={busy || !cloudConfigured}>{busy ? 'Working' : mode === 'in' ? 'Sign in' : 'Sign up'}</button>
               <button type="button" className="linkish small" onClick={() => { setMode(mode === 'in' ? 'up' : 'in'); setErr(null) }}>{mode === 'in' ? 'No account? Sign up' : 'Have an account? Sign in'}</button>
+              <hr />
+              {exportButton}
             </form>
           ) : (
             <div className="stack-sm">
               <div><div className="muted small">Signed in as</div><strong className="break">{s.user.email}</strong></div>
               <div className="row gap-sm"><SyncPill />{s.error && <span className="error small">{s.error}</span>}</div>
               <button type="button" className="btn ghost sm block" disabled={busy} onClick={() => void run(syncNow)}>Sync now</button>
-              <button type="button" className="btn ghost sm block" onClick={() => void run(async () => download(`review-radar-export-${new Date().toISOString().slice(0, 10)}.json`, await exportAll()))}>Export all my data (JSON)</button>
+              {exportButton}
               <button type="button" className="btn ghost sm block" onClick={() => void run(signOut, 'Signed out. Your projects stay on this device.')}>Sign out</button>
               <hr />
               <button type="button" className="btn danger-ghost sm block" disabled={busy} onClick={async () => { if (await ask('Delete cloud data?', 'Removes every Review Radar project and snapshot from the cloud. Copies on this device are kept.', 'Delete cloud data')) void run(deleteCloudData, 'Cloud data deleted.') }}>Delete my cloud data</button>
