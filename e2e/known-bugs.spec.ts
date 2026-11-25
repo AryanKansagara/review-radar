@@ -98,7 +98,7 @@ test.fail('#8 a review that starts with a formula is exported as text', async ({
   for (const cell of readCsv(csv).flat()) expect(cell).not.toMatch(/^[=+@\t\r]|^-(?!\d)/)
 })
 
-test.fail('#9 dates: a day that does not exist and a day-first version list', async ({ page }) => {
+test('#9 dates: a day that does not exist and a day-first version list', async ({ page }) => {
   await importProject(page)
   await upload(page, 'd.csv', 'date,rating,review\n2026-02-30,5,a\n2026-10-03 25:99,5,b\n2026-10-03,5,c')
   await expect(ready(page)).toContainText('1 review ready, 2 skipped')
