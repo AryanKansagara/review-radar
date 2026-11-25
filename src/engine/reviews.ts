@@ -28,6 +28,12 @@ export const cleanVersion = (v: string) => v.trim().replace(/^v(?=\d)/i, '')
 
 const lab = (o: unknown): string => (o && typeof o === 'object' && 'label' in o ? String((o as { label: unknown }).label ?? '') : '')
 
+/** 1 to 5 from "5", "5.0", "5 stars" or "5★". Signs, fractions and anything else are not a rating: null. */
+export const readRating = (v: unknown): number | null => {
+  const m = (typeof v === 'number' ? String(v) : typeof v === 'string' ? v.trim() : '').match(/^([1-5])(?:[.,]0+)?(?:\s*(?:stars?|[★⭐*]\uFE0F?))?$/i)
+  return m ? +m[1] : null
+}
+
 /** Converts one page of the public customer-reviews RSS JSON into reviews. Skips the app header entry older feeds include. */
 export function normalizeRss(feed: unknown, appId: string, country: string): Review[] {
   const f = (feed as { feed?: { entry?: unknown } })?.feed
@@ -35,7 +41,7 @@ export function normalizeRss(feed: unknown, appId: string, country: string): Rev
   const entries = Array.isArray(f.entry) ? f.entry : f.entry ? [f.entry] : []
   const out: Review[] = []
   for (const e of entries as Record<string, unknown>[]) {
-    const rating = Number(lab(e['im:rating']))
+    const rating = readRating(lab(e['im:rating']))
     if (!rating) continue
     const id = lab(e.id)
     const date = new Date(lab(e.updated))
@@ -43,7 +49,7 @@ export function normalizeRss(feed: unknown, appId: string, country: string): Rev
     out.push({
       id: id || hashId(`${lab(e.updated)}|${lab(e.title)}|${lab(e.content)}`),
       appId, country: country.toLowerCase(),
-      rating: Math.min(5, Math.max(1, Math.round(rating))),
+      rating,
       version: cleanVersion(lab(e['im:version'])) || 'unknown',
       title: lab(e.title),
       body: lab(e.content),
