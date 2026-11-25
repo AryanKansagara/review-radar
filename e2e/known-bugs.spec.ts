@@ -171,7 +171,7 @@ test('#11 a later page that fails is named', async ({ page }) => {
   await expect(page.locator('p[role=status]')).toContainText(/page 2|incomplete/i)
 })
 
-test.fail('#12 numbers and single letters in a keyword phrase have to match', async ({ page }) => {
+test('#12 numbers and single letters in a keyword phrase have to match', async ({ page }) => {
   await importProject(page)
   await importFile(page, 'k.csv', 'date,rating,review,version\n2026-10-01,5,It has all one needs,1.0\n2026-10-02,2,bad on ios 17,1.0\n2026-10-03,2,bad on ios 18,1.0', 3)
   await tab(page, 'Themes')

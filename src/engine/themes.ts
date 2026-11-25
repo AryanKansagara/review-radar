@@ -46,13 +46,14 @@ const STOP = new Set(('a an and are as at be been but by can could did do does d
 const CJK = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/
 
 /** Lowercase words. Letters of every script are kept, so "stürzt" and "français" stay whole. */
-export function tokenize(text: string): string[] {
-  return text.toLowerCase().replace(/[’'`´]/g, '').replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(w => w.length > 1 && !/^\d+$/.test(w))
-}
+const words = (text: string) => text.toLowerCase().replace(/[’'`´]/g, '').replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean)
 
-const norm = (s: string) => ' ' + tokenize(s).join(' ') + ' '
+/** The words worth clustering by: no single letters and no bare numbers. */
+export const tokenize = (text: string): string[] => words(text).filter(w => w.length > 1 && !/^\d+$/.test(w))
+
+const norm = (s: string) => ' ' + words(s).join(' ') + ' '
 const kwCache = new Map<string, string>()
-const kw = (k: string) => { let v = kwCache.get(k); if (v === undefined) { v = ' ' + tokenize(k).join(' ') + ' '; kwCache.set(k, v) } return v }
+const kw = (k: string) => { let v = kwCache.get(k); if (v === undefined) { v = norm(k); kwCache.set(k, v) } return v }
 
 const keywordsOf = (rule: ThemeRule) => rule.builtin && INTL[rule.id] ? [...rule.keywords, ...INTL[rule.id]] : rule.keywords
 /** Whole-word match for spaced scripts; plain substring for Japanese, Chinese and Korean phrases. */
