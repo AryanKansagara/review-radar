@@ -3,7 +3,7 @@ import { APP, appProject, card, download, expect, feedPage, importFile, importPr
 
 const many = (n: number, p: Partial<FeedReview> = {}, prefix = 'r'): FeedReview[] => Array.from({ length: n }, (_, i) => ({ rating: 5, ...p, id: prefix + i }))
 
-test.fail('#3 changes made while a fetch runs are kept', async ({ page }) => {
+test('#3 changes made while a fetch runs are kept', async ({ page }) => {
   let release = () => {}
   const wait = new Promise<void>(r => { release = r })
   let hold = true
@@ -20,7 +20,7 @@ test.fail('#3 changes made while a fetch runs are kept', async ({ page }) => {
   await expect(page.locator('.imports li')).toHaveCount(1)
 })
 
-test.fail('#3 a project deleted while its fetch runs stays deleted', async ({ page }) => {
+test('#3 a project deleted while its fetch runs stays deleted', async ({ page }) => {
   let release = () => {}
   const wait = new Promise<void>(r => { release = r })
   await store(page, async () => { await wait; return feedPage(many(2)) })
@@ -168,6 +168,34 @@ test.fail('#16 release notes thank the storefront the complaints came from', asy
   await page.locator('.fix-list input').first().click()
   await expect(page.locator('.notes-pre')).toContainText('Fixed a crash')
   await expect(page.locator('.notes-pre')).not.toContainText('review in US')
+})
+
+test('#3 a replied mark and a removed competitor survive a fetch', async ({ page }) => {
+  let release = () => {}
+  let wait: Promise<void> | null = null
+  await store(page, async ({ id }) => { await wait; return feedPage(many(2, {}, id === '987654321' ? 'x' : 'r')) }, [APP, RIVAL])
+  await appProject(page)
+  await expect(page.getByText('Fetched 2 new reviews').first()).toBeVisible()
+  await tab(page, 'Compare')
+  await page.getByRole('button', { name: 'Add competitor' }).click()
+  await page.getByLabel('App Store link, app id or name').fill('rival')
+  await page.getByRole('button', { name: /Rival Notes/ }).click()
+  wait = new Promise<void>(r => { release = r })
+  await page.getByRole('button', { name: 'Fetch now' }).click()
+  await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible()
+  await tab(page, 'Compare')
+  await page.getByRole('button', { name: 'Remove Rival Notes' }).click()
+  await tab(page, 'Reviews')
+  await page.getByRole('button', { name: 'Draft reply' }).first().click()
+  await page.getByRole('button', { name: 'Mark replied' }).click()
+  await expect(page.getByRole('button', { name: 'Mark not replied' })).toBeVisible()
+  release()
+  await expect(page.getByText('Fetched 0 new reviews (2 total).')).toBeVisible()
+  await page.reload()
+  await page.getByLabel('Status').selectOption('replied')
+  await expect(page.locator('.review')).toHaveCount(1)
+  await tab(page, 'Compare')
+  await expect(page.getByText('No competitors yet')).toBeVisible()
 })
 
 test.fail('#17 a signed-out user can export everything from the account menu', async ({ page }) => {
