@@ -233,7 +233,7 @@ function ReviewItem({ r, p, a }: { r: Review; p: Project; a: Analysis }) {
 }
 
 function Actions({ p, a }: { p: Project; a: Analysis }) {
-  const notes = releaseNotes(a.fix.filter(f => p.addressed.includes(f.id)), [...new Set(a.reviews.filter(r => r.rating <= 2).map(r => r.country))].length === 1 ? [a.reviews[0].country] : [])
+  const notes = releaseNotes(a.fix.filter(f => p.addressed.includes(f.id)), [...new Set(a.reviews.filter(r => r.rating <= 2).map(r => r.country))])
   const toggle = (id: string) => void update(p, { addressed: p.addressed.includes(id) ? p.addressed.filter(x => x !== id) : [...p.addressed, id] })
   const setReply = (patch: Partial<Project['reply']>) => void update(p, { reply: { ...p.reply, ...patch } })
   const todo = a.reviews.filter(r => r.rating <= 3 && !p.replied.includes(r.id)).length
