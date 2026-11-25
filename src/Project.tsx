@@ -6,7 +6,7 @@ import { CountryHeat, Dist, ThemeBubbles, Timeline } from './Charts.tsx'
 import { analyze, bumpData, getReviews, importedApp, IMPORTED, isStoreApp, makeSnapshot, useAnalysis, useReviews, type Analysis } from './projectData.ts'
 import { getProject, putData, saveProject, update, useProjects, type Project } from './store.ts'
 import { deleteSnapshotCloud } from './sync.ts'
-import { Empty, fmtDate, fmtPct, go, Link, NotFound, signed, Stars, SyntheticBadge, toast } from './ui.tsx'
+import { Empty, fmtDate, fmtDay, fmtPct, go, Link, NotFound, signed, Stars, SyntheticBadge, toast } from './ui.tsx'
 import { AppPicker } from './Workspace.tsx'
 
 const Insights = lazy(() => import('./Insights.tsx'))
@@ -52,7 +52,7 @@ export default function ProjectView({ id, tab }: { id: string; tab: string }) {
             <input aria-label="Project name" className="title-input" value={p.name} onChange={e => void update(p, { name: e.target.value })} onBlur={e => { if (!e.target.value.trim()) void update(p, { name: app?.name ?? 'Untitled' }) }} />
             {p.sampleId && <SyntheticBadge />}
           </h1>
-          <p className="muted small">{app ? <>{app.developer} · {app.genre} · current v{app.version}{app.currentVersionReleaseDate ? ` (${fmtDate(app.currentVersionReleaseDate)})` : ''}{app.url && <> · <a href={app.url} target="_blank" rel="noreferrer">App Store ↗</a></>}</> : 'No app linked. Imported reviews only.'}</p>
+          <p className="muted small">{app ? <>{app.developer} · {app.genre} · current v{app.version}{app.currentVersionReleaseDate ? ` (${fmtDay(app.currentVersionReleaseDate)})` : ''}{app.url && <> · <a href={app.url} target="_blank" rel="noreferrer">App Store ↗</a></>}</> : 'No app linked. Imported reviews only.'}</p>
         </div>
         <div className="row gap-sm wrap">
           {!p.sampleId && app && <Link href={`/app/p/${p.id}/data?fetch=1`} className="btn ghost sm">Fetch latest</Link>}

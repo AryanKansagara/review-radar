@@ -24,7 +24,10 @@ export function Link({ href, children, ...rest }: AnchorHTMLAttributes<HTMLAncho
 // ---------- Formatting ----------
 
 export const fmtPct = (n: number | null, d = 0) => n === null || !Number.isFinite(n) ? 'n/a' : `${(n * 100).toFixed(d)}%`
-export const fmtDate = (iso: string) => new Date(iso.length === 10 ? iso + 'T12:00:00Z' : iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+/** A day ("2026-10-01") reads the same everywhere; a timestamp is shown in local time. */
+export const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: iso.length === 10 ? 'UTC' : undefined })
+/** The UTC day of a review or release, as in the version panel, the charts and the exports. */
+export const fmtDay = (iso: string) => fmtDate(iso.slice(0, 10))
 export const fmtStars = (n: number) => Number.isFinite(n) ? n.toFixed(2) : 'n/a'
 export const signed = (n: number, d = 2) => (n > 0 ? '+' : n < 0 ? '−' : '±') + Math.abs(n).toFixed(d)
 export const plural = (n: number, w: string) => `${n.toLocaleString()} ${w}${n === 1 ? '' : 's'}`

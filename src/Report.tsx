@@ -5,7 +5,7 @@ import { releaseNotes } from './engine/themes.ts'
 import { CountryHeat, Dist, Timeline } from './Charts.tsx'
 import { useAnalysis, useReviews } from './projectData.ts'
 import { useProjects } from './store.ts'
-import { fmtDate, fmtPct, Link, NotFound, signed } from './ui.tsx'
+import { fmtDate, fmtDay, fmtPct, Link, NotFound, signed } from './ui.tsx'
 
 export default function Report({ id }: { id: string }) {
   const list = useProjects()
@@ -52,7 +52,7 @@ export default function Report({ id }: { id: string }) {
         <section className="sheet-sec"><h2>What to fix next <span className="muted small">(all versions)</span></h2>
           <ol className="fix-print">{a.fix.slice(0, 5).map(f => <li key={f.id}><b>{f.label}</b>: {f.why}</li>)}</ol>
         </section>
-        {worst.length > 0 && <section className="sheet-sec"><h2>In their words</h2>{worst.map(r => <blockquote key={r.id} className="quote"><b>{r.rating}★ {r.title}</b> {r.body} <span className="muted">· {countryName(r.country)}, {fmtDate(r.date)}</span></blockquote>)}</section>}
+        {worst.length > 0 && <section className="sheet-sec"><h2>In their words</h2>{worst.map(r => <blockquote key={r.id} className="quote"><b>{r.rating}★ {r.title}</b> {r.body} <span className="muted">· {countryName(r.country)}, {fmtDay(r.date)}</span></blockquote>)}</section>}
         {new Set(a.byCountry.map(c => c.country)).size > 1 && <section className="sheet-sec"><h2>By country</h2><CountryHeat cells={a.byCountry} versions={a.versions.map(x => x.version)} /></section>}
         {notes && <section className="sheet-sec"><h2>Proposed release notes</h2><pre className="notes-pre">{notes}</pre></section>}
         <footer className="sheet-foot muted small">Ratings from public App Store reviews with written text (the feed returns the 500 most recent per country). Intervals are 95% bootstrap (means) and Wilson (shares). Review Radar.</footer>

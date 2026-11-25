@@ -281,13 +281,16 @@ test('#19 importing again with the version column fixes the stored reviews', asy
   await expect(page.locator('.review')).toContainText('v3.2')
 })
 
-test.fail('#20 a date-only import is shown on the day in the file', async ({ browser, baseURL }) => {
-  const context = await browser.newContext({ baseURL, timezoneId: 'America/New_York' })
-  const page = await context.newPage()
-  await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.fulfill({ status: 200, body: '' }))
-  await importProject(page)
-  await importFile(page, 'd.csv', 'date,rating,review\n2026-10-01,5,fine', 1)
-  await tab(page, 'Reviews')
-  await expect(page.locator('.review')).toContainText('Oct 1, 2026')
-  await context.close()
+for (const timezoneId of ['America/New_York', 'Pacific/Kiritimati', 'Pacific/Pago_Pago']) test.describe(() => {
+  test.use({ timezoneId })
+  test(`#20 review dates are the day in the file and the version panel: ${timezoneId}`, async ({ page }) => {
+    await importProject(page)
+    await importFile(page, 'd.csv', 'date,rating,review,version\n2026-10-01,1,early,1.0\n2026-10-02T23:30:00Z,1,late,1.0', 2)
+    await saveVersions(page, '1.0,2026-10-01')
+    const panel = page.locator('details').filter({ has: page.getByRole('heading', { name: 'Version history' }) })
+    await expect(panel.locator('.versions')).toContainText('Oct 1, 2026')
+    await tab(page, 'Reviews')
+    await expect(page.locator('.review').filter({ hasText: 'early' })).toContainText('Oct 1, 2026')
+    await expect(page.locator('.review').filter({ hasText: 'late' })).toContainText('Oct 2, 2026')
+  })
 })
