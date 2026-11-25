@@ -249,10 +249,16 @@ test('#3 a replied mark and a removed competitor survive a fetch', async ({ page
   await expect(page.getByText('No competitors yet')).toBeVisible()
 })
 
-test.fail('#17 a signed-out user can export everything from the account menu', async ({ page }) => {
+test('#17 a signed-out user can export everything from the account menu', async ({ page }) => {
   await importProject(page)
+  await importFile(page, 'one.csv', 'date,rating,review\n2026-10-01,5,keep me', 1)
   await page.getByRole('button', { name: 'Sign in to sync' }).click()
   await expect(page.getByRole('button', { name: 'Export all my data (JSON)' })).toBeVisible()
+  const [name, json] = await download(page, page.getByRole('button', { name: 'Export all my data (JSON)' }))
+  expect(name).toMatch(/^review-radar-export-\d{4}-\d\d-\d\d\.json$/)
+  const { projects } = JSON.parse(json)
+  expect(projects).toHaveLength(1)
+  expect(projects[0].dataset.map((r: { body: string }) => r.body)).toEqual(['keep me'])
 })
 
 test('#18 two people who wrote the same short review both count', async ({ page }) => {
