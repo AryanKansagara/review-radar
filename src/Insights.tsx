@@ -8,7 +8,7 @@ import type { Review, ThemeRule } from './engine/types.ts'
 import { ThemeBubbles } from './Charts.tsx'
 import type { Analysis } from './projectData.ts'
 import { getProject, saveProject, update, type Project } from './store.ts'
-import { CopyButton, download, Empty, fmtDate, fmtPct, Link, plural, Stars, toast } from './ui.tsx'
+import { CopyButton, download, Empty, fmtDay, fmtPct, Link, plural, Stars, toast } from './ui.tsx'
 
 export default function Insights({ p, a, tab }: { p: Project; a: Analysis; tab: string }) {
   if (tab === 'themes') return <Themes p={p} a={a} />
@@ -99,7 +99,7 @@ function ThemeDetail({ rule, reviews, onClose }: { rule: ThemeRule; reviews: Rev
     <div className="card pad">
       <div className="row between"><h2 className="h4">{rule.label} · {plural(reviews.length, 'review')}</h2><button type="button" className="icon-btn" aria-label="Close" onClick={onClose}>×</button></div>
       <ul className="review-list compact">
-        {reviews.slice(0, 12).map(r => <li key={r.id}><Stars value={r.rating} size={12} /> <b>{r.title}</b> <span className="muted small">{r.version} · {r.country.toUpperCase()} · {fmtDate(r.date)}</span><p className="small">{highlight(r.body, matchedKeywords(r, rule))}</p></li>)}
+        {reviews.slice(0, 12).map(r => <li key={r.id}><Stars value={r.rating} size={12} /> <b>{r.title}</b> <span className="muted small">{r.version} · {r.country.toUpperCase()} · {fmtDay(r.date)}</span><p className="small">{highlight(r.body, matchedKeywords(r, rule))}</p></li>)}
       </ul>
     </div>
   )
@@ -200,7 +200,7 @@ function ReviewItem({ r, p, a }: { r: Review; p: Project; a: Analysis }) {
       <div className="rv-head">
         <Stars value={r.rating} />
         <b className="rv-title">{r.title || '(no title)'}</b>
-        <span className="muted small">{r.author} · v{r.version} · {countryName(r.country)} · {fmtDate(r.date)}</span>
+        <span className="muted small">{r.author} · v{r.version} · {countryName(r.country)} · {fmtDay(r.date)}</span>
       </div>
       <p>{r.body}</p>
       <div className="row wrap gap-sm">
