@@ -93,7 +93,7 @@ function ImportPanel({ p, startOpen }: { p: Project; startOpen: boolean }) {
   const appId = p.apps[0]?.id ?? 'imported'
   const country = p.countries[0] ?? 'us'
   const load = (text: string, fileName: string) => {
-    const whole = parseAscJson(text, appId) ?? parseFeedJson(text, appId, country)
+    const whole = parseAscJson(text, appId, country) ?? parseFeedJson(text, appId, country)
     if (whole) { setPending({ fileName, rows: null, map: {}, result: whole }); return }
     const json = jsonToRows(text)
     if (!json && /^\s*[[{]/.test(text)) { toast('That JSON is not a format Review Radar reads. Accepted: App Store Connect customerReviews, saved review feed pages, or an array of review objects.', { tone: 'error' }); return }

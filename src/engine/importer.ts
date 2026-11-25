@@ -87,15 +87,28 @@ export function detectMapping(header: string[]): Mapping {
 export interface Issue { line: number; level: 'error' | 'warning'; message: string }
 export interface ImportResult { reviews: Review[]; issues: Issue[]; skipped: number; format: string }
 
-// Territory names in App Store Connect exports are three-letter codes; map the common ones to storefront codes.
-const ISO3: Record<string, string> = { USA: 'us', GBR: 'gb', CAN: 'ca', AUS: 'au', IND: 'in', DEU: 'de', FRA: 'fr', ESP: 'es', ITA: 'it', NLD: 'nl', BRA: 'br', MEX: 'mx', JPN: 'jp', KOR: 'kr', SWE: 'se', IRL: 'ie', NZL: 'nz', SGP: 'sg', CHN: 'cn', TWN: 'tw', HKG: 'hk' }
+// Every code in the App Store Connect API's TerritoryCode list (developer.apple.com/documentation/appstoreconnectapi/territorycode)
+// followed by its two-letter storefront code: ISO 3166-1, plus Apple's own XKS for Kosovo.
+const ISO3: Record<string, string> = Object.fromEntries((
+  'ABWaw AFGaf AGOao AIAai ALBal ANDad ANTan AREae ARGar ARMam ASMas ATGag AUSau AUTat AZEaz BDIbi BELbe BENbj BESbq BFAbf BGDbd BGRbg BHRbh BHSbs BIHba BLRby BLZbz BMUbm ' +
+  'BOLbo BRAbr BRBbb BRNbn BTNbt BWAbw CAFcf CANca CHEch CHLcl CHNcn CIVci CMRcm CODcd COGcg COKck COLco COMkm CPVcv CRIcr CUBcu CUWcw CXRcx CYMky CYPcy CZEcz DEUde DJIdj ' +
+  'DMAdm DNKdk DOMdo DZAdz ECUec EGYeg ERIer ESPes ESTee ETHet FINfi FJIfj FLKfk FRAfr FROfo FSMfm GABga GBRgb GEOge GGYgg GHAgh GIBgi GINgn GLPgp GMBgm GNBgw GNQgq GRCgr ' +
+  'GRDgd GRLgl GTMgt GUFgf GUMgu GUYgy HKGhk HNDhn HRVhr HTIht HUNhu IDNid IMNim INDin IRLie IRQiq ISLis ISRil ITAit JAMjm JEYje JORjo JPNjp KAZkz KENke KGZkg KHMkh KIRki ' +
+  'KNAkn KORkr KWTkw LAOla LBNlb LBRlr LBYly LCAlc LIEli LKAlk LSOls LTUlt LUXlu LVAlv MACmo MARma MCOmc MDAmd MDGmg MDVmv MEXmx MHLmh MKDmk MLIml MLTmt MMRmm MNEme MNGmn ' +
+  'MNPmp MOZmz MRTmr MSRms MTQmq MUSmu MWImw MYSmy MYTyt NAMna NCLnc NERne NFKnf NGAng NICni NIUnu NLDnl NORno NPLnp NRUnr NZLnz OMNom PAKpk PANpa PERpe PHLph PLWpw PNGpg ' +
+  'POLpl PRIpr PRTpt PRYpy PSEps PYFpf QATqa REUre ROUro RUSru RWArw SAUsa SENsn SGPsg SHNsh SLBsb SLEsl SLVsv SMRsm SOMso SPMpm SRBrs SSDss STPst SURsr SVKsk SVNsi SWEse ' +
+  'SWZsz SXMsx SYCsc TCAtc TCDtd TGOtg THAth TJKtj TKMtm TLStl TONto TTOtt TUNtn TURtr TUVtv TWNtw TZAtz UGAug UKRua UMIum URYuy USAus UZBuz VATva VCTvc VENve VGBvg VIRvi ' +
+  'VNMvn VUTvu WLFwf WSMws XKSxk YEMye ZAFza ZMBzm ZWEzw'
+).split(' ').map(x => [x.slice(0, 3), x.slice(3)]))
 export function toCountry(s: string | undefined): string | null {
   if (!s) return null
   const t = s.trim()
-  if (/^[a-z]{2}$/i.test(t)) return t.toLowerCase()
-  if (ISO3[t.toUpperCase()]) return ISO3[t.toUpperCase()]
+  const two = (c: string) => c.toLowerCase() === 'uk' ? 'gb' : c.toLowerCase()
+  if (/^[a-z]{2}$/i.test(t)) return two(t)
+  const code = t.toUpperCase()
+  if (Object.hasOwn(ISO3, code)) return ISO3[code]
   const loc = t.match(/^[a-z]{2}[-_]([a-z]{2})$/i)
-  if (loc) return loc[1].toLowerCase()
+  if (loc) return two(loc[1])
   return null
 }
 
@@ -179,7 +192,7 @@ export function rowsToReviews(rows: string[][], map: Mapping, appId: string, def
 }
 
 /** App Store Connect API: GET /v1/apps/{id}/customerReviews JSON (one page or an array of pages). */
-export function parseAscJson(text: string, appId: string): ImportResult | null {
+export function parseAscJson(text: string, appId: string, defaultCountry = 'us'): ImportResult | null {
   let j: unknown
   try { j = JSON.parse(text) } catch { return null }
   const pages = Array.isArray(j) ? j : [j]
@@ -192,7 +205,9 @@ export function parseAscJson(text: string, appId: string): ImportResult | null {
     const date = toDate(String(a.createdDate ?? ''))
     const rating = Number(a.rating)
     if (!date || !(rating >= 1 && rating <= 5)) { issues.push({ line: i + 1, level: 'error', message: `Review ${i + 1} has no valid date or rating. Skipped.` }); return }
-    reviews.push({ id: String((d as { id?: string }).id ?? hashId(JSON.stringify(a))), appId, country: toCountry(String(a.territory ?? '')) ?? 'us', rating, version: 'unknown', title: String(a.title ?? ''), body: String(a.body ?? ''), author: String(a.reviewerNickname ?? ''), date, source: 'import' })
+    const country = toCountry(String(a.territory ?? ''))
+    if (!country) issues.push({ line: i + 1, level: 'warning', message: `Review ${i + 1}: ${a.territory ? `unknown territory "${a.territory}"` : 'no territory'}, using ${defaultCountry.toUpperCase()}.` })
+    reviews.push({ id: String((d as { id?: string }).id ?? hashId(JSON.stringify(a))), appId, country: country ?? defaultCountry, rating, version: 'unknown', title: String(a.title ?? ''), body: String(a.body ?? ''), author: String(a.reviewerNickname ?? ''), date, source: 'import' })
   })
   issues.push({ line: 1, level: 'warning', message: 'The customerReviews API does not include the app version. Add a version history list so reviews are assigned to releases by date.' })
   return { reviews, issues, skipped: data.length - reviews.length, format: 'App Store Connect API JSON' }

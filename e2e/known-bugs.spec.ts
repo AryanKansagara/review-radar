@@ -54,7 +54,7 @@ test('#4 a row with more cells than the header is not imported under the wrong c
   await expect(ready(page)).toContainText('1 review ready, 1 skipped · 1 error')
 })
 
-test.fail('#5 App Store Connect territories outside the 21 in the table are not counted as the US', async ({ page }) => {
+test('#5 App Store Connect territories outside the 21 in the table are not counted as the US', async ({ page }) => {
   await importProject(page)
   const review = (id: string, territory: string) => ({ type: 'customerReviews', id, attributes: { rating: 1, title: 'T', body: 'B', reviewerNickname: 'n', createdDate: '2026-07-05T00:00:00Z', territory } })
   await upload(page, 'asc.json', JSON.stringify({ data: [review('a', 'CHE'), review('b', 'AUT'), review('c', 'POL')] }))
