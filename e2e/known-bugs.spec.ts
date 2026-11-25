@@ -261,7 +261,7 @@ test('#18 ids a spreadsheet rounded do not make different reviews duplicates', a
   await expect(ready(page)).toContainText('2 reviews ready')
 })
 
-test.fail('#19 importing again with the version column fixes the stored reviews', async ({ page }) => {
+test('#19 importing again with the version column fixes the stored reviews', async ({ page }) => {
   await importProject(page)
   await importFile(page, 'one.csv', 'id,date,rating,review\n1,2026-10-01,5,a', 1)
   await importFile(page, 'two.csv', 'id,date,rating,review,version\n1,2026-10-01,5,a,3.2', 1)

@@ -210,7 +210,7 @@ export function parseAscJson(text: string, appId: string, defaultCountry = 'us')
     if (!date || !(rating >= 1 && rating <= 5)) { issues.push({ line: i + 1, level: 'error', message: `Review ${i + 1} has no valid date or rating. Skipped.` }); return }
     const country = toCountry(String(a.territory ?? ''))
     if (!country) issues.push({ line: i + 1, level: 'warning', message: `Review ${i + 1}: ${a.territory ? `unknown territory "${a.territory}"` : 'no territory'}, using ${defaultCountry.toUpperCase()}.` })
-    reviews.push({ id: String((d as { id?: string }).id ?? hashId(JSON.stringify(a))), appId, country: country ?? defaultCountry, rating, version: 'unknown', title: String(a.title ?? ''), body: String(a.body ?? ''), author: String(a.reviewerNickname ?? ''), date, source: 'import' })
+    reviews.push({ id: String((d as { id?: string }).id ?? hashId(JSON.stringify(a))), appId, country: country ?? defaultCountry, ...(country ? {} : { countryAssumed: true as const }), rating, version: 'unknown', title: String(a.title ?? ''), body: String(a.body ?? ''), author: String(a.reviewerNickname ?? ''), date, source: 'import' })
   })
   issues.push({ line: 1, level: 'warning', message: 'The customerReviews API does not include the app version. Add a version history list so reviews are assigned to releases by date.' })
   return { reviews, issues, skipped: data.length - reviews.length, format: 'App Store Connect API JSON' }
@@ -228,11 +228,11 @@ export function parseFeedJson(text: string, appId: string, defaultCountry = 'us'
   for (const p of pages) {
     // The storefront is part of the feed's own address: https://itunes.apple.com/gb/rss/customerreviews/...
     const self = JSON.stringify((p as { feed: { id?: unknown } }).feed.id ?? '')
-    const country = self.match(/apple\.com\/([a-z]{2})\/rss\//i)?.[1].toLowerCase() ?? defaultCountry
-    for (const r of normalizeRss(p, appId, country)) {
+    const country = self.match(/apple\.com\/([a-z]{2})\/rss\//i)?.[1].toLowerCase()
+    for (const r of normalizeRss(p, appId, country ?? defaultCountry)) {
       if (seen.has(r.id)) { dupes++; continue }
       seen.add(r.id)
-      reviews.push({ ...r, source: 'import' })
+      reviews.push({ ...r, ...(country ? {} : { countryAssumed: true as const }), source: 'import' })
     }
   }
   const issues: Issue[] = []

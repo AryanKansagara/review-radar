@@ -54,3 +54,42 @@ test('merge: reviews by different people in different files both stay', () => {
   // A store id is never matched by content.
   assert.equal(mergeReviews([{ ...amy[0], id: '14766651509' }], amy).added, 1)
 })
+
+const ID = 'id,date,rating,review'
+const one = (head: string, row: string, country?: string) => read(`${head}\n${row}`, country)
+const stored = (a: Review[], b: Review[]) => { const m = mergeReviews(a, b); return { ...m, r: m.reviews[0] } }
+
+test('merge: importing again with a corrected mapping fixes the stored review', () => {
+  const bare = one(ID, '1,2026-10-01,5,a')
+  const full = one(ID + ',version,title,country,nickname', '1,2026-10-01,5,a,3.2,T,gb,amy')
+  let m = stored(bare, full)
+  assert.deepEqual([m.added, m.updated], [0, 1])
+  assert.deepEqual([m.r.version, m.r.title, m.r.country, m.r.author, m.r.countryAssumed], ['3.2', 'T', 'gb', 'amy', undefined])
+  // Never the reverse, even when the project's default country changed.
+  m = stored(full, one(ID, '1,2026-10-01,5,a', 'de'))
+  assert.deepEqual([m.added, m.updated, m.r], [0, 0, full[0]])
+  m = stored(full, one(ID + ',version,title,country', '1,2026-10-01,5,a,3.3,Other,fr'))
+  assert.deepEqual([m.updated, m.r.version, m.r.title, m.r.country, m.r.author], [1, '3.3', 'Other', 'fr', 'amy'])
+})
+
+test('merge: the same correction reaches reviews without ids, which keep the id they have', () => {
+  const bare = one('date,rating,review', '2026-10-01,5,a')
+  const m = stored(bare, one('date,rating,review,version,country,nickname', '2026-10-01,5,a,3.2,gb,amy'))
+  assert.deepEqual([m.added, m.updated, m.r.id, m.r.version, m.r.country, m.r.author], [0, 1, bare[0].id, '3.2', 'gb', 'amy'])
+})
+
+test('merge: a later edit without a version keeps the known one, an older reading only fills gaps', () => {
+  const known = one(ID + ',version', '1,2026-10-01,5,a,3.2')
+  let m = stored(known, one(ID, '1,2026-10-05,2,b'))
+  assert.deepEqual([m.updated, m.r.version, m.r.body, m.r.rating], [1, '3.2', 'b', 2])
+  m = stored(one(ID, '1,2026-10-05,2,b'), known)
+  assert.deepEqual([m.updated, m.r.version, m.r.body, m.r.rating, m.r.date.slice(0, 10)], [1, '3.2', 'b', 2, '2026-10-05'])
+  m = stored(one(ID + ',version', '1,2026-10-05,2,b,3.3'), known)
+  assert.deepEqual([m.updated, m.r.version], [0, '3.3'])
+})
+
+test('merge: a review the feed lists in two storefronts is not moved back and forth', () => {
+  const gb: Review = { ...one(ID + ',country', '1,2026-10-01,5,a,gb')[0], source: 'rss' }
+  const m = mergeReviews([gb], [gb, { ...gb, country: 'de' }])
+  assert.deepEqual([m.updated, m.reviews[0].country], [0, 'gb'])
+})
