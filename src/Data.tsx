@@ -115,8 +115,7 @@ function ImportPanel({ p, startOpen }: { p: Project; startOpen: boolean }) {
     const existing = await getReviews(p)
     // Versions are assigned after the merge: a row is recognised by what the file says, not by what the list adds.
     const m = mergeReviews(existing, pending.result.reviews)
-    const added = new Set(pending.result.reviews)
-    const reviews = m.reviews.map(r => added.has(r) ? assignVersions([r], p.versions[appId] ?? [])[0] : r)
+    const reviews = assignVersions(m.reviews, p.versions[appId] ?? [], appId)
     await putData(p.id, reviews)
     const meta = { id: uuid(), kind: 'reviews' as const, fileName: pending.fileName, format: pending.result.format, rows: pending.result.reviews.length, issues: pending.result.issues.length, at: Date.now() }
     const cur = getProject(p.id)!
@@ -190,7 +189,7 @@ function VersionsPanel({ p }: { p: Project }) {
     if (!parsed?.versions.length) return
     const versions = mergeVersions(list, parsed.versions)
     const rs = await getReviews(p)
-    const assigned = assignVersions(rs, versions)
+    const assigned = assignVersions(rs, versions, appId)
     const changed = assigned.filter((r, i) => r !== rs[i]).length
     if (changed) { await putData(p.id, assigned); bumpData() }
     const cur = getProject(p.id)!
