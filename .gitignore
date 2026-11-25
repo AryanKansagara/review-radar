@@ -1,8 +1,0 @@
-node_modules
-dist
-.vercel
-*.tsbuildinfo
-.env
-.env.local
-.env*
-qa-check.mjs
