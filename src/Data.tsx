@@ -113,12 +113,14 @@ function ImportPanel({ p, startOpen }: { p: Project; startOpen: boolean }) {
   const commit = async () => {
     if (!pending) return
     const existing = await getReviews(p)
-    const withVersions = assignVersions(pending.result.reviews, p.versions[appId] ?? [])
-    const m = mergeReviews(existing, withVersions)
-    await putData(p.id, m.reviews)
+    // Versions are assigned after the merge: a row is recognised by what the file says, not by what the list adds.
+    const m = mergeReviews(existing, pending.result.reviews)
+    const added = new Set(pending.result.reviews)
+    const reviews = m.reviews.map(r => added.has(r) ? assignVersions([r], p.versions[appId] ?? [])[0] : r)
+    await putData(p.id, reviews)
     const meta = { id: uuid(), kind: 'reviews' as const, fileName: pending.fileName, format: pending.result.format, rows: pending.result.reviews.length, issues: pending.result.issues.length, at: Date.now() }
     const cur = getProject(p.id)!
-    await saveProject({ ...cur, imports: [...cur.imports, meta], snapshots: [...cur.snapshots, makeSnapshot(cur, m.reviews, `Import ${pending.fileName}`, Date.now())] })
+    await saveProject({ ...cur, imports: [...cur.imports, meta], snapshots: [...cur.snapshots, makeSnapshot(cur, reviews, `Import ${pending.fileName}`, Date.now())] })
     bumpData()
     toast(`Imported ${plural(m.added, 'new review')}${m.updated ? `, updated ${m.updated}` : ''}.`, { tone: 'ok' })
     setPending(null); setPaste('')

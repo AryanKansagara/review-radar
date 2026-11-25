@@ -94,12 +94,47 @@ export function hashId(s: string): string {
   return 'h' + (h >>> 0).toString(36)
 }
 
-/** Merges fetched reviews into the stored set. Same id: the newer edit wins (reviewers can update a review). */
+/** Id for an imported row without one, from everything that tells two reviews apart. */
+export const contentId = (s: string) => [s, '~' + s].map(x => 'h' + hashId(x).slice(1).padStart(7, '0')).join('')
+const isContentId = (id: string) => /^h[0-9a-z]{7}h[0-9a-z]{7}$/.test(id)
+/** A long id a spreadsheet has rounded, such as 1.47667E+10: many reviews can share it. */
+export const isRoundedId = (id: string) => /^[+-]?\d+(?:[.,]\d+)?e[+-]\d+$/i.test(id)
+/** Stored under an id that does not come from the store. Earlier versions hashed fewer fields and kept rounded ids. */
+const isOwnId = (id: string) => isContentId(id) || isRoundedId(id) || /^h[0-9a-z]{1,7}$/.test(id)
+
+const country = (r: Review) => r.countryAssumed ? '' : r.country
+const version = (r: Review) => r.version === 'unknown' ? '' : r.version
+const same = (a: string, b: string) => a === b
+const fits = (a: string, b: string) => !a || !b || a === b
+const agree = (a: Review, b: Review, eq: (x: string, y: string) => boolean) => eq(a.author, b.author) && eq(country(a), country(b)) && eq(version(a), version(b))
+
+/**
+ * Stored reviews that rows without an id stand for. Such rows match on what they say: same date, rating, title and text, and an author,
+ * country and version that do not contradict. Each stored review is matched once, so two people who wrote the same words stay two.
+ */
+function matchByContent(stored: Map<string, Review>, incoming: Review[]): Map<Review, string> {
+  const out = new Map<Review, string>()
+  const rows = incoming.filter(r => isContentId(r.id) && !stored.has(key(r)))
+  if (!rows.length) return out
+  const taken = new Set(incoming.map(key))
+  const content = (r: Review) => JSON.stringify([r.appId, r.date, r.rating, r.title, r.body])
+  const by = new Map<string, Review[]>()
+  for (const [k, r] of stored) if (isOwnId(r.id) && !taken.has(k)) by.set(content(r), [...(by.get(content(r)) ?? []), r])
+  for (const eq of [same, fits]) for (const r of rows) {
+    if (out.has(r)) continue
+    const old = by.get(content(r))?.find(o => !taken.has(key(o)) && agree(o, r, eq))
+    if (old) { taken.add(key(old)); out.set(r, key(old)) }
+  }
+  return out
+}
+
+/** Merges fetched or imported reviews into the stored set. Same id: the newer edit wins (reviewers can update a review). */
 export function mergeReviews(existing: Review[], incoming: Review[]): { reviews: Review[]; added: number; updated: number } {
   const map = new Map(existing.map(r => [key(r), r]))
+  const matched = matchByContent(map, incoming)
   let added = 0, updated = 0
   for (const r of incoming) {
-    const k = key(r)
+    const k = matched.get(r) ?? key(r)
     const old = map.get(k)
     if (!old) { map.set(k, r); added++ }
     else if (r.date > old.date || (r.date === old.date && (r.body !== old.body || r.rating !== old.rating))) { map.set(k, r); updated++ }
