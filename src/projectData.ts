@@ -75,6 +75,7 @@ export async function runFetch(id: string, onProgress?: (label: string, p: Fetch
   let outage = false
   const failed: string[] = []
   const empty: string[] = []
+  const incomplete: string[] = []
   const fetched = new Map<string, { app: AppInfo; reviews: Review[] }>()
   for (const a of start.apps.filter(isStoreApp)) {
     const own = a.id === start.apps[0].id
@@ -83,11 +84,12 @@ export async function runFetch(id: string, onProgress?: (label: string, p: Fetch
     // Competitors get fewer pages to keep the fetch quick.
     const res = await fetchReviews(app.id, start.countries, own ? pages : Math.min(pages, 4), pr => onProgress?.(app.name, pr), signal)
     failed.push(...res.failed.map(c => `${app.name} (${c.toUpperCase()})`))
+    incomplete.push(...res.incomplete.map(c => `${app.name} ${c}`))
     if (looksLikeOutage(res, start.countries, app.ratingCount)) { if (own) outage = true }
     else if (own) empty.push(...res.empty)
     fetched.set(a.id, { app, reviews: res.reviews })
   }
-  const gone = { added: 0, updated: 0, total: 0, failed, empty, outage, deleted: true }
+  const gone = { added: 0, updated: 0, total: 0, failed, empty, incomplete, outage, deleted: true }
   let cur = getProject(id)
   if (!cur) return gone
   const existing = await getReviews(cur)
@@ -113,7 +115,7 @@ export async function runFetch(id: string, onProgress?: (label: string, p: Fetch
   if (added || updated || !p.snapshots.length && all.length) p.snapshots = [...p.snapshots, makeSnapshot(p, all, `Fetch ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`, Date.now())]
   await saveProject(p)
   bumpData()
-  return { added, updated, total: all.length, failed, empty, outage, deleted: false }
+  return { added, updated, total: all.length, failed, empty, incomplete, outage, deleted: false }
 }
 
 export function makeSnapshot(p: Project, reviews: Review[], label: string, at: number): Snapshot {

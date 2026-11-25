@@ -50,9 +50,9 @@ function FetchPanel({ p, auto }: { p: Project; auto: boolean }) {
       if (r.deleted) return
       const msg = r.outage
         ? `${OUTAGE_NOTE} ${r.total ? `Your ${r.total.toLocaleString()} stored reviews are untouched.` : 'Nothing was saved.'} Try again later, or import a file below.`
-        : `Fetched ${plural(r.added, 'new review')}${r.updated ? `, ${r.updated} edited` : ''} (${r.total.toLocaleString()} total).${r.failed.length ? ` No response for ${r.failed.join(', ')}.` : ''}${r.empty.length ? ` No written reviews in ${r.empty.map(c => c.toUpperCase()).join(', ')}.` : ''}`
+        : `Fetched ${plural(r.added, 'new review')}${r.updated ? `, ${r.updated} edited` : ''} (${r.total.toLocaleString()} total).${r.failed.length ? ` No response for ${r.failed.join(', ')}.` : ''}${r.incomplete.length ? ` Incomplete: ${r.incomplete.join(', ')}. Fetch again to get the rest.` : ''}${r.empty.length ? ` No written reviews in ${r.empty.map(c => c.toUpperCase()).join(', ')}.` : ''}`
       setResult(msg)
-      toast(msg, { tone: r.outage ? 'error' : r.failed.length ? undefined : 'ok' })
+      toast(msg, { tone: r.outage ? 'error' : r.failed.length || r.incomplete.length ? undefined : 'ok' })
     } catch (e) {
       if (c.signal.aborted) { setResult('Fetch cancelled. Nothing was saved.'); return }
       const m = e instanceof Error ? e.message : String(e)
