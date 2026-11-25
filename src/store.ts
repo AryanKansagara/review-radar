@@ -104,12 +104,13 @@ export const getProject = (id: string) => projects.find(p => p.id === id)
 
 export async function saveProject(p: Project, opts: { touch?: boolean; silent?: boolean } = {}) {
   const next = opts.touch === false ? p : { ...p, updatedAt: Date.now() }
-  await idbPut('projects', next)
+  // Memory first, in the same tick: an input bound to the project must see its new value before the next keystroke.
   const i = projects.findIndex(x => x.id === p.id)
   if (i >= 0) projects[i] = next
   else projects.unshift(next)
   projects.sort((a, b) => b.updatedAt - a.updatedAt)
   emit()
+  await idbPut('projects', next)
   if (!opts.silent) changeHooks.forEach(f => f(next))
   return next
 }
@@ -133,6 +134,7 @@ export async function deleteProject(id: string): Promise<() => Promise<void>> {
 
 export const getData = (id: string) => idbGet<Review[]>('data', id)
 export const putData = (id: string, rs: Review[]) => idbPut('data', rs, id)
+export const delData = (id: string) => idbDel('data', id)
 export const uuid = () => crypto.randomUUID()
 
 // Tombstones keep a project deleted offline from coming back on the next sync.
