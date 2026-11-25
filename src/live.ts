@@ -34,6 +34,8 @@ export interface FetchResult {
   failed: string[]
   /** Countries where the feed answered but listed no reviews: either nobody has written one there, or the feed is having an outage. */
   empty: string[]
+  /** Countries whose later pages are missing, and where: "US (stopped at page 2 of 10)". */
+  incomplete: string[]
 }
 
 /**
@@ -44,6 +46,7 @@ export async function fetchReviews(appId: string, countries: string[], pages: nu
   const out: Review[] = []
   const failed: string[] = []
   const empty: string[] = []
+  const incomplete: string[] = []
   const total = countries.length * pages
   let done = 0
   const queue = [...countries]
@@ -55,16 +58,24 @@ export async function fetchReviews(appId: string, countries: string[], pages: nu
       for (let p = 1; p <= Math.min(pages, last); p++) {
         try {
           const [url, alt] = feedUrls(c, appId, p)
-          let feed = await get(url, signal)
+          let retried = false
+          let feed = await get(url, signal).catch(e => {
+            if (signal?.aborted) throw e
+            retried = true
+            return get(alt, signal)
+          })
           let rs = normalizeRss(feed, appId, c)
+          // An error, then an empty answer: that is not an app without reviews.
+          if (retried && !rs.length) throw new Error('no reviews on the second address')
           const setLast = (f: unknown, n: number) => { const l = feedLastPage(f); known = l !== null; last = l ?? (n < 50 ? 1 : pages) }
           if (p === 1) setLast(feed, rs.length)
-          if (rs.length < 50 && (p === 1 || (known && p < last))) {
+          if (!retried && rs.length < 50 && (p === 1 || (known && p < last))) {
             const again = await get(alt, signal).catch(() => null)
             const rs2 = normalizeRss(again, appId, c)
             if (rs2.length > rs.length) { rs = rs2; feed = again; if (p === 1) setLast(feed, rs.length) }
           }
           if (p === 1 && !rs.length) empty.push(c)
+          if (known && p > 1 && p < last && !rs.length) incomplete.push(`${c.toUpperCase()} (page ${p} of ${Math.min(pages, last)} came back empty)`)
           out.push(...rs)
           done++; counted++
           onProgress?.({ done, total, country: c, reviews: out.length, failed })
@@ -72,8 +83,9 @@ export async function fetchReviews(appId: string, countries: string[], pages: nu
           if ((!rs.length && p === 1) || (!known && rs.length < 50)) break
         } catch (e) {
           if (signal?.aborted) throw e
-          // Page 1 failing means the country failed; later pages failing just ends that country.
+          // Page 1 failing means the country failed; a later page failing on both addresses ends it there.
           if (p === 1) failed.push(c)
+          else incomplete.push(`${c.toUpperCase()} (stopped at page ${p}${known ? ` of ${Math.min(pages, last)}` : ''})`)
           break
         }
       }
@@ -83,7 +95,7 @@ export async function fetchReviews(appId: string, countries: string[], pages: nu
     }
   }
   await Promise.all([worker(), worker()])
-  return { reviews: out, failed, empty }
+  return { reviews: out, failed, empty, incomplete }
 }
 
 /**

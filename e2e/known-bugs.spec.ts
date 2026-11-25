@@ -164,7 +164,7 @@ for (const data of ['{"feed":null}', '{"data":[null]}', '{"feed":{"entry":[null]
   await expect(page.locator('.toast.error, .validation.has-errors').first()).toBeVisible()
 })
 
-test.fail('#11 a later page that fails is named', async ({ page }) => {
+test('#11 a later page that fails is named', async ({ page }) => {
   await store(page, ({ page: p }) => p === 1 ? feedPage(many(50), 10) : { status: 503 })
   await appProject(page)
   await expect(page.locator('p[role=status]')).toContainText('Fetched 50 new reviews')
