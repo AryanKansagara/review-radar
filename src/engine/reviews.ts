@@ -40,7 +40,8 @@ export function normalizeRss(feed: unknown, appId: string, country: string): Rev
   if (!f) return []
   const entries = Array.isArray(f.entry) ? f.entry : f.entry ? [f.entry] : []
   const out: Review[] = []
-  for (const e of entries as Record<string, unknown>[]) {
+  for (const e of entries as (Record<string, unknown> | null)[]) {
+    if (!e) continue
     const rating = readRating(lab(e['im:rating']))
     if (!rating) continue
     const id = lab(e.id)

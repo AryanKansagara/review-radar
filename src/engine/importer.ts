@@ -234,11 +234,11 @@ export function parseAscJson(text: string, appId: string, defaultCountry = 'us')
   try { j = JSON.parse(text) } catch { return null }
   const pages = Array.isArray(j) ? j : [j]
   const data = pages.flatMap(p => (p as { data?: unknown[] })?.data ?? [])
-  if (!data.length || (data[0] as { type?: string }).type !== 'customerReviews') return null
+  if (!data.some(d => (d as { type?: string } | null)?.type === 'customerReviews')) return null
   const issues: Issue[] = []
   const reviews: Review[] = []
   data.forEach((d, i) => {
-    const a = (d as { attributes?: Record<string, unknown> }).attributes ?? {}
+    const a = (d as { attributes?: Record<string, unknown> } | null)?.attributes ?? {}
     const date = toDate(String(a.createdDate ?? ''))
     const rating = readRating(a.rating)
     if (!date || !rating) { issues.push({ line: i + 1, level: 'error', message: `Review ${i + 1} has no valid date or rating. Skipped.` }); return }
@@ -258,34 +258,47 @@ export function parseFeedJson(text: string, appId: string, defaultCountry = 'us'
   if (!pages.length) return null
   const seen = new Set<string>()
   const reviews: Review[] = []
-  let dupes = 0
+  const issues: Issue[] = []
+  let dupes = 0, n = 0
   for (const p of pages) {
     // The storefront is part of the feed's own address: https://itunes.apple.com/gb/rss/customerreviews/...
-    const self = JSON.stringify((p as { feed: { id?: unknown } }).feed.id ?? '')
+    const self = JSON.stringify((p as { feed: { id?: unknown } | null }).feed?.id ?? '')
     const country = self.match(/apple\.com\/([a-z]{2})\/rss\//i)?.[1].toLowerCase()
-    for (const r of normalizeRss(p, appId, country ?? defaultCountry)) {
+    const entry = (p as { feed: { entry?: unknown } | null }).feed?.entry ?? []
+    for (const e of Array.isArray(entry) ? entry : [entry]) {
+      const line = ++n
+      const [r] = normalizeRss({ feed: { entry: [e] } }, appId, country ?? defaultCountry)
+      if (!r) {
+        // Older feeds begin with an entry that describes the app.
+        if (!e || typeof e !== 'object' || 'im:rating' in e || !('im:name' in e)) issues.push({ line, level: 'error', message: `Entry ${line} has no valid date or rating. Skipped.` })
+        continue
+      }
       if (seen.has(r.id)) { dupes++; continue }
       seen.add(r.id)
       reviews.push({ ...r, ...(country ? {} : { countryAssumed: true as const }), source: 'import' })
     }
   }
-  const issues: Issue[] = []
-  if (!reviews.length) issues.push({ line: 1, level: 'error', message: 'This feed page lists no reviews. Apple’s feed sometimes answers with an empty list; save the page again later.' })
+  const bad = issues.length
+  if (!reviews.length) issues.push({ line: 1, level: 'error', message: bad ? 'This feed page lists no readable reviews.' : 'This feed page lists no reviews. Apple’s feed sometimes answers with an empty list; save the page again later.' })
   if (dupes) issues.push({ line: 1, level: 'warning', message: `${dupes} reviews appear on more than one page. Kept once.` })
-  return { reviews, issues, skipped: dupes, format: 'App Store reviews feed JSON' }
+  return { reviews, issues, skipped: dupes + bad, format: 'App Store reviews feed JSON' }
 }
+
+const isObject = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x)
 
 /**
  * A JSON array of flat objects, such as the output of the app-store-scraper libraries
  * ([{ id, userName, version, score, title, text, updated }, ...]), as header + rows for the CSV path.
+ * Anything else in the array becomes an empty row, which is then reported on its line.
  */
 export function jsonToRows(text: string): string[][] | null {
   let j: unknown
   try { j = JSON.parse(text) } catch { return null }
-  if (!Array.isArray(j) || !j.length || !j.every(x => x && typeof x === 'object' && !Array.isArray(x))) return null
-  const keys = [...new Set((j as Record<string, unknown>[]).flatMap(o => Object.keys(o)))]
+  if (!Array.isArray(j) || !j.length || !j.some(isObject)) return null
+  const objects = j.map(x => isObject(x) ? x : {})
+  const keys = [...new Set(objects.flatMap(o => Object.keys(o)))]
   const cell = (v: unknown) => v === null || v === undefined ? '' : typeof v === 'object' ? '' : String(v)
-  return [keys, ...(j as Record<string, unknown>[]).map(o => keys.map(k => cell(o[k])))]
+  return [keys, ...objects.map(o => keys.map(k => cell(o[k])))]
 }
 
 /** Version history: "version,date[,notes]" per line, with or without a header. */
