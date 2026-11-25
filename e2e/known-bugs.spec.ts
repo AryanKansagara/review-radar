@@ -35,20 +35,20 @@ test.fail('#3 a project deleted while its fetch runs stays deleted', async ({ pa
   await expect(page.getByText('Track your first app')).toBeVisible()
 })
 
-test.fail('#4 a quote inside an unquoted cell does not swallow the following rows', async ({ page }) => {
+test('#4 a quote inside an unquoted cell does not swallow the following rows', async ({ page }) => {
   await importProject(page)
   await upload(page, 'q.csv', 'date,rating,review,version\n2026-10-01,1,My 6" screen,5.4\n2026-10-02,2,Crash,5.4\n2026-10-03,3,Bad,5.4\n')
   await expect(ready(page)).toContainText('3 reviews ready')
 })
 
-test.fail('#4 a file cut off inside a quoted cell is reported', async ({ page }) => {
+test('#4 a file cut off inside a quoted cell is reported', async ({ page }) => {
   await importProject(page)
   await upload(page, 'q.csv', 'date,rating,version,review\n2026-10-01,1,5.4,fine\n2026-10-02,2,5.4,"cut off in the midd')
   await expect(ready(page)).toContainText('1 review ready')
   await expect(issues(page)).toContainText(/quote/i)
 })
 
-test.fail('#4 a row with more cells than the header is not imported under the wrong columns', async ({ page }) => {
+test('#4 a row with more cells than the header is not imported under the wrong columns', async ({ page }) => {
   await importProject(page)
   await upload(page, 'q.csv', 'date,rating,title,review,version,country\n2026-10-01,1,Crashes,Since the update, it crashes,5.4,de\n2026-10-02,2,Meh,Fine,5.4,de')
   await expect(ready(page)).toContainText('1 review ready, 1 skipped · 1 error')
