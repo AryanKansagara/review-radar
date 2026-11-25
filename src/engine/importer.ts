@@ -43,10 +43,15 @@ export const parseCsv = (text: string): string[][] => readCsv(text).rows
 
 const notClosed = (line: number): Issue => ({ line, level: 'error', message: 'The quote opened here is never closed, so this row and everything after it was not read. The file may be cut off.' })
 
+/** Text a spreadsheet would run, or that starts with the quotes that mark such text (OWASP, CSV injection). */
+const FORMULA = /^'*[=+\-@\t\r\n＝＋－＠]/
+const guard = (s: string) => FORMULA.test(s) && !/^-\d+(?:\.\d+)?$/.test(s) ? `'${s}` : s
+
+/** Cells that would start a formula are prefixed with '. */
 export function toCsv(rows: (string | number | null | undefined)[][]): string {
   return rows.map(r => r.map(v => {
-    const s = v === null || v === undefined ? '' : String(v)
-    return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    const s = v === null || v === undefined ? '' : typeof v === 'number' ? String(v) : guard(v)
+    return /[",\r\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
   }).join(',')).join('\n') + '\n'
 }
 
@@ -197,7 +202,12 @@ export function rowsToReviews(rows: string[][], map: Mapping, appId: string, def
   let skipped = 0, roundedAt = 0
   for (const f of FIELDS) if (f.required && map[f.f] === undefined) issues.push({ line: 1, level: 'error', message: `No column mapped to ${f.label}.` })
   if (issues.length) return { reviews, issues, skipped: rows.length - 1, format: 'csv' }
-  const get = (r: string[], f: Field) => map[f] === undefined ? '' : (r[map[f]!] ?? '').trim()
+  // In our own export the ' in front of a formula was added by toCsv.
+  const own = rows[0].join() === EXPORT_HEADER.join()
+  const get = (r: string[], f: Field) => {
+    const s = map[f] === undefined ? '' : (r[map[f]!] ?? '').trim()
+    return (own && FORMULA.test(s) && s.startsWith("'") ? s.slice(1) : s).trim()
+  }
   const dayFirst = isDayFirst(rows.slice(1).map(r => get(r, 'date')))
   if (dayFirst) issues.push(DAY_FIRST)
   rows.slice(1).forEach((r, i) => {
@@ -335,9 +345,11 @@ export function assignVersions(reviews: Review[], versions: VersionInfo[], appId
   })
 }
 
+const EXPORT_HEADER = ['id', 'date', 'country', 'version', 'rating', 'title', 'review', 'author', 'themes', 'source']
+
 export function reviewsCsv(reviews: Review[], themesOf: (r: Review) => string[]): string {
   return toCsv([
-    ['id', 'date', 'country', 'version', 'rating', 'title', 'review', 'author', 'themes', 'source'],
+    EXPORT_HEADER,
     ...reviews.map(r => [r.id, r.date.slice(0, 10), r.country, r.version, r.rating, r.title, r.body, r.author, themesOf(r).join('; '), r.source]),
   ])
 }

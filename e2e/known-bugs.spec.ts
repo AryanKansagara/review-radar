@@ -1,4 +1,4 @@
-// Each test states the right behaviour of an open issue and is expected to fail until that issue is fixed.
+// Each test states the right behaviour of a bug that was reported; the number is its issue.
 import { APP, appProject, card, download, expect, feedPage, importFile, importProject, issues, readCsv, ready, RIVAL, row, saveVersions, store, tab, test, upload, type FeedReview } from './fixtures'
 
 const many = (n: number, p: Partial<FeedReview> = {}, prefix = 'r'): FeedReview[] => Array.from({ length: n }, (_, i) => ({ rating: 5, ...p, id: prefix + i }))
@@ -90,7 +90,7 @@ test('#2 typing at normal speed keeps every character', async ({ page }) => {
   await expect(name).toHaveValue('Streakly: Habit Tracker')
 })
 
-test.fail('#8 a review that starts with a formula is exported as text', async ({ page }) => {
+test('#8 a review that starts with a formula is exported as text', async ({ page }) => {
   await importProject(page)
   await importFile(page, 'f.csv', 'date,rating,title,review,version,nickname\n2026-10-01,1,+1,"=HYPERLINK(""https://example.com"",""x"")",1.0,@me\n2026-10-02,1,-,ok,1.0,n', 2)
   await tab(page, 'Actions')
