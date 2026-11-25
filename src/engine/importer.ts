@@ -112,49 +112,83 @@ export function toCountry(s: string | undefined): string | null {
   return null
 }
 
+const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december']
+/** 1 to 12 for an English month name or its first letters ("Oct", "Sept"), else 0. */
+const monthOf = (s: string) => s.length < 3 ? 0 : MONTHS.findIndex(m => m.startsWith(s.toLowerCase())) + 1
+const US_ZONES: Record<string, number> = { est: -5, edt: -4, cst: -6, cdt: -5, mst: -7, mdt: -6, pst: -8, pdt: -7 }
+const WEEKDAY = /^(?:sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)(?:day|nesday|sday|rsday|urday)?\.?,?\s+/i
+
+/** Whole seconds, as milliseconds, after midnight UTC for "5:30 PM", "12:00:00.123Z", "08:15:42 -07:00", "23:00 GMT+0200 (CEST)"; null when that is not a time. */
+function timeOf(s: string): number | null {
+  if (!s) return 0
+  const m = s.match(/^(?:(\d{1,2})(?::(\d{2})(?::(\d{2})(?:[.,]\d+)?)?)?\s*([ap]\.?m\.?)?)?\s*(z|utc|gmt|[ecmp][sd]t)?\s*(?:([+-])(\d{1,2}):?(\d{2})?)?(?:\s*\([^()]*\))?$/i)
+  if (!m) return null
+  let h = +(m[1] ?? 0)
+  const mi = +(m[2] ?? 0), sec = +(m[3] ?? 0)
+  if (m[1] && !m[2] && !m[4]) return null
+  if (m[4]) {
+    if (h < 1 || h > 12) return null
+    h = h % 12 + (/^p/i.test(m[4]) ? 12 : 0)
+  }
+  // 24:00 is the midnight that ends the day.
+  if (mi > 59 || sec > 59 || h > 24 || (h === 24 && (mi || sec))) return null
+  const off = m[6] ? (m[6] === '-' ? -1 : 1) * (+m[7] * 60 + +(m[8] ?? 0)) : (US_ZONES[(m[5] ?? '').toLowerCase()] ?? 0) * 60
+  if (Math.abs(off) > 14 * 60 || +(m[8] ?? 0) > 59) return null
+  return ((h * 60 + mi - off) * 60 + sec) * 1000
+}
+
+function iso(y: number, mo: number, d: number, ms: number | null): string | null {
+  const day = new Date(Date.UTC(y, mo - 1, d))
+  // Date.UTC rolls 30 February over into March, and reads years below 100 as 19xx.
+  if (ms === null || day.getUTCFullYear() !== y || day.getUTCMonth() !== mo - 1 || day.getUTCDate() !== d) return null
+  return new Date(+day + ms).toISOString()
+}
+
 /**
- * ISO date from "2026-10-03", "2026-10-03 12:00:00", "2026-10-03T12:00:00Z", "10/03/2026", "3 Oct 2026" or a Unix timestamp.
+ * ISO date from "2026-10-03", "2026-10-03 12:00:00", "2026-10-03T12:00:00Z", "10/03/2026", "3 Oct 2026", "Oct 3, 2026 5:30 PM" or a Unix timestamp.
+ * Anything else, and a day or time that does not exist, is null.
  * Timestamps without a zone are read as UTC so the same file imports the same way on every device.
- * Slash dates are month first unless `dayFirst` is set or the first part is over 12.
+ * 10/03/2026, 10.03.2026 and 10-03-2026 are month first unless `dayFirst` is set or the first part is over 12.
  */
 export function toDate(s: string | undefined, dayFirst = false): string | null {
   if (!s) return null
-  const t = s.trim()
-  let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ](\d{1,2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?)?\s*(Z|[+-]\d{2}:?\d{2})?$/i)
-  if (m) {
-    const [y, mo, da] = [+m[1], +m[2], +m[3]]
-    if (mo < 1 || mo > 12 || da < 1 || da > 31) return null
-    const utc = Date.UTC(y, mo - 1, da, +(m[4] ?? 0), +(m[5] ?? 0), +(m[6] ?? 0))
-    const z = m[7] && m[7].toUpperCase() !== 'Z' ? m[7].match(/([+-])(\d{2}):?(\d{2})/)! : null
-    const off = z ? (z[1] === '-' ? -1 : 1) * (+z[2] * 60 + +z[3]) * 6e4 : 0
-    return new Date(utc - off).toISOString()
-  }
-  m = t.match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{2,4})/)
-  if (m) {
-    let a = +m[1], b = +m[2]
-    if (dayFirst || a > 12) [a, b] = [b, a]
-    const y = m[3].length === 2 ? 2000 + +m[3] : +m[3]
-    const d = new Date(Date.UTC(y, a - 1, b))
-    return a >= 1 && a <= 12 && b >= 1 && b <= 31 && !isNaN(+d) ? d.toISOString() : null
-  }
+  const t = s.trim().replace(WEEKDAY, '')
   if (/^\d{10}$/.test(t)) return new Date(+t * 1000).toISOString()
   if (/^\d{13}$/.test(t)) return new Date(+t).toISOString()
-  if (/^\d+$/.test(t)) return null
-  const d = new Date(/\d{4}/.test(t) && !/(Z|GMT|UTC|[+-]\d{2}:?\d{2})$/i.test(t) ? t + ' UTC' : t)
-  return isNaN(+d) ? null : d.toISOString()
+  let m = t.match(/^(\d{4})([-/.])(\d{1,2})\2(\d{1,2})(?:(?:t|,?\s+)(?=\d)|\s*(?=z|[+-]\d|\s[a-z])|$)(.*)$/i)
+  if (m) return iso(+m[1], +m[3], +m[4], timeOf(m[5].trim()))
+  m = t.match(/^(\d{1,2})([-/.])(\d{1,2})\2(\d{4}|\d{2})(?:,?\s+(.*))?$/)
+  if (m) {
+    let a = +m[1], b = +m[3]
+    if (dayFirst || a > 12) [a, b] = [b, a]
+    const time = timeOf(m[5] ?? '')
+    // Slash and dot dates have always been read as a whole day.
+    return iso(m[4].length === 2 ? 2000 + +m[4] : +m[4], a, b, time === null || m[2] === '-' ? time : 0)
+  }
+  // With the month in letters: "3 Oct 2026", "3-Oct-26", "October 3rd, 2026 at 5:30 PM", "2026 Oct 3", "Sat Oct 03 12:00:00 2026".
+  const w = t.replace(/^(\S+\s+\d{1,2})\s+(\d{1,2}:\S+)\s+(\d{4})$/, '$1 $3 $2')
+  const d = w.match(/^(\d{1,2})(?:st|nd|rd|th)?[\s,./-]*([a-z]+)[\s,./-]*(\d{4}|\d{2})(?![\d:])(.*)$/i)
+  if (d) return lettered(d[3], d[2], d[1], d[4])
+  const f = w.match(/^([a-z]+)[\s,./-]*(\d{1,2})(?:st|nd|rd|th)?[\s,./-]+(\d{4}|\d{2})(?![\d:])(.*)$/i)
+  if (f) return lettered(f[3], f[1], f[2], f[4])
+  const y = w.match(/^(\d{4})[\s,./-]*([a-z]+)[\s,./-]*(\d{1,2})(?![\d:])(.*)$/i)
+  return y ? lettered(y[1], y[2], y[3], y[4]) : null
 }
+const lettered = (y: string, mo: string, d: string, rest: string) =>
+  iso(y.length === 2 ? 2000 + +y : +y, monthOf(mo), +d, /^$|^[\s,]/.test(rest) ? timeOf(rest.replace(/^[\s,]+(?:at\s+)?/i, '')) : null)
 
-/** A slash-date column is day first when any row has a first part over 12 and no row has a second part over 12. */
+/** A column of dates such as 03/10/2026 is day first when any row has a first part over 12 and no row has a second part over 12. */
 export function isDayFirst(values: string[]): boolean {
   let first = false, second = false
   for (const v of values) {
-    const m = v.trim().match(/^(\d{1,2})[/.](\d{1,2})[/.]\d{2,4}/)
+    const m = v.trim().match(/^(\d{1,2})([-/.])(\d{1,2})\2(?:\d{4}|\d{2})(?!\d)/)
     if (!m) continue
     if (+m[1] > 12) first = true
-    if (+m[2] > 12) second = true
+    if (+m[3] > 12) second = true
   }
   return first && !second
 }
+const DAY_FIRST: Issue = { line: 1, level: 'warning', message: 'Dates read as day/month/year, because some rows have a day above 12.' }
 
 export function rowsToReviews(rows: string[][], map: Mapping, appId: string, defaultCountry = 'us', src: Partial<Pick<CsvText, 'lines' | 'openQuote'>> = {}): ImportResult {
   const issues: Issue[] = []
@@ -165,7 +199,7 @@ export function rowsToReviews(rows: string[][], map: Mapping, appId: string, def
   if (issues.length) return { reviews, issues, skipped: rows.length - 1, format: 'csv' }
   const get = (r: string[], f: Field) => map[f] === undefined ? '' : (r[map[f]!] ?? '').trim()
   const dayFirst = isDayFirst(rows.slice(1).map(r => get(r, 'date')))
-  if (dayFirst) issues.push({ line: 1, level: 'warning', message: 'Dates read as day/month/year, because some rows have a day above 12.' })
+  if (dayFirst) issues.push(DAY_FIRST)
   rows.slice(1).forEach((r, i) => {
     const line = src.lines?.[i + 1] ?? i + 2
     // A comma in unquoted text moves every later cell one column on, so nothing after it can be trusted.
@@ -259,10 +293,12 @@ export function parseVersions(text: string): { versions: VersionInfo[]; issues: 
   const { rows, lines, openQuote } = readCsv(text)
   const issues: Issue[] = openQuote ? [notClosed(openQuote)] : []
   const versions: VersionInfo[] = []
+  const dayFirst = isDayFirst(rows.map(r => r[1] ?? ''))
+  if (dayFirst) issues.push(DAY_FIRST)
   rows.forEach((r, i) => {
     if (i === 0 && /version/i.test(r[0] ?? '')) return
     const [v, d, ...notes] = r
-    const date = toDate(d)
+    const date = toDate(d, dayFirst)
     if (!v || !date) { issues.push({ line: lines[i], level: 'error', message: `Expected "version,date", got "${r.join(',')}".` }); return }
     versions.push({ version: cleanVersion(v), date: date.slice(0, 10), notes: notes.join(', ') || undefined, origin: 'listed' })
   })
