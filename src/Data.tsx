@@ -47,6 +47,7 @@ function FetchPanel({ p, auto }: { p: Project; auto: boolean }) {
     setBusy(true); setResult(null)
     try {
       const r = await runFetch(p.id, (label, pr) => setProg({ label, p: pr }), c.signal)
+      if (r.deleted) return
       const msg = r.outage
         ? `${OUTAGE_NOTE} ${r.total ? `Your ${r.total.toLocaleString()} stored reviews are untouched.` : 'Nothing was saved.'} Try again later, or import a file below.`
         : `Fetched ${plural(r.added, 'new review')}${r.updated ? `, ${r.updated} edited` : ''} (${r.total.toLocaleString()} total).${r.failed.length ? ` No response for ${r.failed.join(', ')}.` : ''}${r.empty.length ? ` No written reviews in ${r.empty.map(c => c.toUpperCase()).join(', ')}.` : ''}`

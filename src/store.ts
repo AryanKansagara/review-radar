@@ -134,6 +134,7 @@ export async function deleteProject(id: string): Promise<() => Promise<void>> {
 
 export const getData = (id: string) => idbGet<Review[]>('data', id)
 export const putData = (id: string, rs: Review[]) => idbPut('data', rs, id)
+export const delData = (id: string) => idbDel('data', id)
 export const uuid = () => crypto.randomUUID()
 
 // Tombstones keep a project deleted offline from coming back on the next sync.
