@@ -69,7 +69,7 @@ test.fail('#6 nothing is called emerging when there is no earlier version', asyn
   await expect(page.locator('.fix-list li').first()).not.toContainText('up 50 points')
 })
 
-test.fail('#2 typing at normal speed keeps every character', async ({ page }) => {
+test('#2 typing at normal speed keeps every character', async ({ page }) => {
   await page.goto('/app?sample=habit')
   await tab(page, 'Actions')
   const box = page.getByLabel('Signature')
@@ -81,6 +81,13 @@ test.fail('#2 typing at normal speed keeps every character', async ({ page }) =>
   await page.keyboard.press('Home')
   await page.keyboard.type('My own ')
   await expect(name).toHaveValue('My own Streakly: Habit Tracker')
+  await page.waitForTimeout(500) // the last write to IndexedDB
+  await page.reload()
+  await expect(name).toHaveValue('My own Streakly: Habit Tracker')
+  await expect(box).toHaveValue('Sam, developer of Streakly')
+  await name.fill('')
+  await name.blur()
+  await expect(name).toHaveValue('Streakly: Habit Tracker')
 })
 
 test.fail('#8 a review that starts with a formula is exported as text', async ({ page }) => {
