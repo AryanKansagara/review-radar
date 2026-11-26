@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { assignVersions, detectMapping, FIELDS, jsonToRows, parseAscJson, parseCsv, parseFeedJson, parseVersions, rowsToReviews, type ImportResult, type Mapping } from './engine/importer.ts'
+import { assignVersions, detectMapping, FIELDS, jsonToRows, parseAscJson, parseFeedJson, parseVersions, readCsv, rowsToReviews, type CsvText, type ImportResult, type Mapping } from './engine/importer.ts'
 import { COUNTRIES, mergeReviews } from './engine/reviews.ts'
 import type { VersionInfo } from './engine/types.ts'
 import { OUTAGE_NOTE, type FetchProgress } from './live.ts'
@@ -84,7 +84,7 @@ function FetchPanel({ p, auto }: { p: Project; auto: boolean }) {
   )
 }
 
-interface Pending { fileName: string; rows: string[][] | null; map: Mapping; result: ImportResult }
+interface Pending { fileName: string; rows: string[][] | null; csv?: CsvText; map: Mapping; result: ImportResult }
 
 function ImportPanel({ p, startOpen }: { p: Project; startOpen: boolean }) {
   const [pending, setPending] = useState<Pending | null>(null)
@@ -93,20 +93,21 @@ function ImportPanel({ p, startOpen }: { p: Project; startOpen: boolean }) {
   const appId = p.apps[0]?.id ?? 'imported'
   const country = p.countries[0] ?? 'us'
   const load = (text: string, fileName: string) => {
-    const whole = parseAscJson(text, appId) ?? parseFeedJson(text, appId, country)
+    const whole = parseAscJson(text, appId, country) ?? parseFeedJson(text, appId, country)
     if (whole) { setPending({ fileName, rows: null, map: {}, result: whole }); return }
     const json = jsonToRows(text)
     if (!json && /^\s*[[{]/.test(text)) { toast('That JSON is not a format Review Radar reads. Accepted: App Store Connect customerReviews, saved review feed pages, or an array of review objects.', { tone: 'error' }); return }
-    const rows = json ?? parseCsv(text)
-    if (rows.length < 2) { toast('That file has no data rows. Expected a header row then one review per row.', { tone: 'error' }); return }
+    const csv = json ? undefined : readCsv(text)
+    const rows = json ?? csv!.rows
+    if (rows.length < 2) { toast(csv?.openQuote ? `That file has no readable data rows: the quote opened on line ${csv.openQuote} is never closed.` : 'That file has no data rows. Expected a header row then one review per row.', { tone: 'error' }); return }
     const map = detectMapping(rows[0])
-    setPending({ fileName, rows, map, result: { ...rowsToReviews(rows, map, appId, country), format: json ? 'JSON array' : 'csv' } })
+    setPending({ fileName, rows, csv, map, result: { ...rowsToReviews(rows, map, appId, country, csv), format: json ? 'JSON array' : 'csv' } })
   }
   const remap = (f: keyof Mapping, i: number | undefined) => {
     if (!pending?.rows) return
     const map = { ...pending.map, [f]: i }
     if (i === undefined) delete map[f]
-    setPending({ ...pending, map, result: { ...rowsToReviews(pending.rows, map, appId, country), format: pending.result.format } })
+    setPending({ ...pending, map, result: { ...rowsToReviews(pending.rows, map, appId, country, pending.csv), format: pending.result.format } })
   }
   const commit = async () => {
     if (!pending) return

@@ -2,26 +2,46 @@
 import { cleanVersion, hashId, normalizeRss } from './reviews.ts'
 import type { Review, VersionInfo } from './types.ts'
 
-export function parseCsv(text: string): string[][] {
-  const rows: string[][] = []
-  let row: string[] = [], cell = '', q = false
+export interface CsvText {
+  rows: string[][]
+  /** The line each row starts on, counting from 1. */
+  lines: number[]
+  /** Where a quoted cell was opened that the text never closes. Its row is cut off somewhere unknown and is left out. */
+  openQuote: number | null
+}
+
+export function readCsv(text: string): CsvText {
+  const out: CsvText = { rows: [], lines: [], openQuote: null }
+  // `quoted`: the current cell began with a quote. Only then are quotes syntax; in a plain cell (My 6" screen) they are text.
+  let row: string[] = [], cell = '', q = false, quoted = false, line = 1, start = 1, opened = 1
   const first = text.split('\n', 1)[0]
   const delim = (first.match(/\t/g)?.length ?? 0) > (first.match(/,/g)?.length ?? 0) ? '\t' : (first.match(/;/g)?.length ?? 0) > (first.match(/,/g)?.length ?? 0) ? ';' : ','
+  const endCell = () => { row.push(cell.trim()); cell = ''; quoted = false }
+  const endRow = () => {
+    endCell()
+    if (row.some(Boolean)) { out.rows.push(row); out.lines.push(start) }
+    row = []
+  }
   for (let i = 0; i < text.length; i++) {
     const c = text[i]
+    const newline = c === '\n' || (c === '\r' && text[i + 1] !== '\n')
     if (q) {
+      if (newline) line++
       if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++ } else q = false }
       else cell += c
-    } else if (c === '"') q = true
-    else if (c === delim) { row.push(cell); cell = '' }
-    else if (c === '\n' || c === '\r') {
-      if (c === '\r' && text[i + 1] === '\n') i++
-      row.push(cell); rows.push(row); row = []; cell = ''
-    } else cell += c
+    } else if (c === '"' && (quoted || !cell.trim())) { q = quoted = true; opened = line }
+    else if (c === delim) endCell()
+    else if (newline) { endRow(); start = ++line }
+    else if (c !== '\r') cell += c
   }
-  if (cell || row.length) { row.push(cell); rows.push(row) }
-  return rows.map(r => r.map(c => c.trim())).filter(r => r.some(Boolean))
+  if (q) out.openQuote = opened
+  else if (cell || row.length) endRow()
+  return out
 }
+
+export const parseCsv = (text: string): string[][] => readCsv(text).rows
+
+const notClosed = (line: number): Issue => ({ line, level: 'error', message: 'The quote opened here is never closed, so this row and everything after it was not read. The file may be cut off.' })
 
 export function toCsv(rows: (string | number | null | undefined)[][]): string {
   return rows.map(r => r.map(v => {
@@ -67,15 +87,28 @@ export function detectMapping(header: string[]): Mapping {
 export interface Issue { line: number; level: 'error' | 'warning'; message: string }
 export interface ImportResult { reviews: Review[]; issues: Issue[]; skipped: number; format: string }
 
-// Territory names in App Store Connect exports are three-letter codes; map the common ones to storefront codes.
-const ISO3: Record<string, string> = { USA: 'us', GBR: 'gb', CAN: 'ca', AUS: 'au', IND: 'in', DEU: 'de', FRA: 'fr', ESP: 'es', ITA: 'it', NLD: 'nl', BRA: 'br', MEX: 'mx', JPN: 'jp', KOR: 'kr', SWE: 'se', IRL: 'ie', NZL: 'nz', SGP: 'sg', CHN: 'cn', TWN: 'tw', HKG: 'hk' }
+// Every code in the App Store Connect API's TerritoryCode list (developer.apple.com/documentation/appstoreconnectapi/territorycode)
+// followed by its two-letter storefront code: ISO 3166-1, plus Apple's own XKS for Kosovo.
+const ISO3: Record<string, string> = Object.fromEntries((
+  'ABWaw AFGaf AGOao AIAai ALBal ANDad ANTan AREae ARGar ARMam ASMas ATGag AUSau AUTat AZEaz BDIbi BELbe BENbj BESbq BFAbf BGDbd BGRbg BHRbh BHSbs BIHba BLRby BLZbz BMUbm ' +
+  'BOLbo BRAbr BRBbb BRNbn BTNbt BWAbw CAFcf CANca CHEch CHLcl CHNcn CIVci CMRcm CODcd COGcg COKck COLco COMkm CPVcv CRIcr CUBcu CUWcw CXRcx CYMky CYPcy CZEcz DEUde DJIdj ' +
+  'DMAdm DNKdk DOMdo DZAdz ECUec EGYeg ERIer ESPes ESTee ETHet FINfi FJIfj FLKfk FRAfr FROfo FSMfm GABga GBRgb GEOge GGYgg GHAgh GIBgi GINgn GLPgp GMBgm GNBgw GNQgq GRCgr ' +
+  'GRDgd GRLgl GTMgt GUFgf GUMgu GUYgy HKGhk HNDhn HRVhr HTIht HUNhu IDNid IMNim INDin IRLie IRQiq ISLis ISRil ITAit JAMjm JEYje JORjo JPNjp KAZkz KENke KGZkg KHMkh KIRki ' +
+  'KNAkn KORkr KWTkw LAOla LBNlb LBRlr LBYly LCAlc LIEli LKAlk LSOls LTUlt LUXlu LVAlv MACmo MARma MCOmc MDAmd MDGmg MDVmv MEXmx MHLmh MKDmk MLIml MLTmt MMRmm MNEme MNGmn ' +
+  'MNPmp MOZmz MRTmr MSRms MTQmq MUSmu MWImw MYSmy MYTyt NAMna NCLnc NERne NFKnf NGAng NICni NIUnu NLDnl NORno NPLnp NRUnr NZLnz OMNom PAKpk PANpa PERpe PHLph PLWpw PNGpg ' +
+  'POLpl PRIpr PRTpt PRYpy PSEps PYFpf QATqa REUre ROUro RUSru RWArw SAUsa SENsn SGPsg SHNsh SLBsb SLEsl SLVsv SMRsm SOMso SPMpm SRBrs SSDss STPst SURsr SVKsk SVNsi SWEse ' +
+  'SWZsz SXMsx SYCsc TCAtc TCDtd TGOtg THAth TJKtj TKMtm TLStl TONto TTOtt TUNtn TURtr TUVtv TWNtw TZAtz UGAug UKRua UMIum URYuy USAus UZBuz VATva VCTvc VENve VGBvg VIRvi ' +
+  'VNMvn VUTvu WLFwf WSMws XKSxk YEMye ZAFza ZMBzm ZWEzw'
+).split(' ').map(x => [x.slice(0, 3), x.slice(3)]))
 export function toCountry(s: string | undefined): string | null {
   if (!s) return null
   const t = s.trim()
-  if (/^[a-z]{2}$/i.test(t)) return t.toLowerCase()
-  if (ISO3[t.toUpperCase()]) return ISO3[t.toUpperCase()]
+  const two = (c: string) => c.toLowerCase() === 'uk' ? 'gb' : c.toLowerCase()
+  if (/^[a-z]{2}$/i.test(t)) return two(t)
+  const code = t.toUpperCase()
+  if (Object.hasOwn(ISO3, code)) return ISO3[code]
   const loc = t.match(/^[a-z]{2}[-_]([a-z]{2})$/i)
-  if (loc) return loc[1].toLowerCase()
+  if (loc) return two(loc[1])
   return null
 }
 
@@ -123,7 +156,7 @@ export function isDayFirst(values: string[]): boolean {
   return first && !second
 }
 
-export function rowsToReviews(rows: string[][], map: Mapping, appId: string, defaultCountry = 'us'): ImportResult {
+export function rowsToReviews(rows: string[][], map: Mapping, appId: string, defaultCountry = 'us', src: Partial<Pick<CsvText, 'lines' | 'openQuote'>> = {}): ImportResult {
   const issues: Issue[] = []
   const reviews: Review[] = []
   const seen = new Set<string>()
@@ -134,7 +167,9 @@ export function rowsToReviews(rows: string[][], map: Mapping, appId: string, def
   const dayFirst = isDayFirst(rows.slice(1).map(r => get(r, 'date')))
   if (dayFirst) issues.push({ line: 1, level: 'warning', message: 'Dates read as day/month/year, because some rows have a day above 12.' })
   rows.slice(1).forEach((r, i) => {
-    const line = i + 2
+    const line = src.lines?.[i + 1] ?? i + 2
+    // A comma in unquoted text moves every later cell one column on, so nothing after it can be trusted.
+    if (r.slice(rows[0].length).some(Boolean)) { issues.push({ line, level: 'error', message: `${r.length} cells for ${rows[0].length} columns. Text that contains the separator must be in quotes. Row skipped.` }); skipped++; return }
     const date = toDate(get(r, 'date'), dayFirst)
     const rating = Number(get(r, 'rating').replace(',', '.').replace(/[^\d.]/g, ''))
     const body = get(r, 'body')
@@ -148,14 +183,16 @@ export function rowsToReviews(rows: string[][], map: Mapping, appId: string, def
     const id = get(r, 'id') || hashId(`${date}|${rating}|${get(r, 'title')}|${body}`)
     if (seen.has(id)) { issues.push({ line, level: 'warning', message: 'Duplicate of an earlier row. Skipped.' }); skipped++; return }
     seen.add(id)
+    if (Object.values(map).some(c => c >= r.length)) issues.push({ line, level: 'warning', message: `Only ${r.length} of ${rows[0].length} cells. Kept, but the row may be cut off.` })
     reviews.push({ id, appId, country: country ?? defaultCountry, rating: Math.round(rating), version, title: get(r, 'title'), body, author: get(r, 'author'), date, source: 'import' })
   })
+  if (src.openQuote) { issues.push(notClosed(src.openQuote)); skipped++ }
   if (reviews.length && reviews.every(r => r.version === 'unknown')) issues.push({ line: 1, level: 'warning', message: 'No version column. Release impact needs versions; add a version history list to assign reviews by date.' })
   return { reviews, issues, skipped, format: 'csv' }
 }
 
 /** App Store Connect API: GET /v1/apps/{id}/customerReviews JSON (one page or an array of pages). */
-export function parseAscJson(text: string, appId: string): ImportResult | null {
+export function parseAscJson(text: string, appId: string, defaultCountry = 'us'): ImportResult | null {
   let j: unknown
   try { j = JSON.parse(text) } catch { return null }
   const pages = Array.isArray(j) ? j : [j]
@@ -168,7 +205,9 @@ export function parseAscJson(text: string, appId: string): ImportResult | null {
     const date = toDate(String(a.createdDate ?? ''))
     const rating = Number(a.rating)
     if (!date || !(rating >= 1 && rating <= 5)) { issues.push({ line: i + 1, level: 'error', message: `Review ${i + 1} has no valid date or rating. Skipped.` }); return }
-    reviews.push({ id: String((d as { id?: string }).id ?? hashId(JSON.stringify(a))), appId, country: toCountry(String(a.territory ?? '')) ?? 'us', rating, version: 'unknown', title: String(a.title ?? ''), body: String(a.body ?? ''), author: String(a.reviewerNickname ?? ''), date, source: 'import' })
+    const country = toCountry(String(a.territory ?? ''))
+    if (!country) issues.push({ line: i + 1, level: 'warning', message: `Review ${i + 1}: ${a.territory ? `unknown territory "${a.territory}"` : 'no territory'}, using ${defaultCountry.toUpperCase()}.` })
+    reviews.push({ id: String((d as { id?: string }).id ?? hashId(JSON.stringify(a))), appId, country: country ?? defaultCountry, rating, version: 'unknown', title: String(a.title ?? ''), body: String(a.body ?? ''), author: String(a.reviewerNickname ?? ''), date, source: 'import' })
   })
   issues.push({ line: 1, level: 'warning', message: 'The customerReviews API does not include the app version. Add a version history list so reviews are assigned to releases by date.' })
   return { reviews, issues, skipped: data.length - reviews.length, format: 'App Store Connect API JSON' }
@@ -214,14 +253,14 @@ export function jsonToRows(text: string): string[][] | null {
 
 /** Version history: "version,date[,notes]" per line, with or without a header. */
 export function parseVersions(text: string): { versions: VersionInfo[]; issues: Issue[] } {
-  const rows = parseCsv(text)
-  const issues: Issue[] = []
+  const { rows, lines, openQuote } = readCsv(text)
+  const issues: Issue[] = openQuote ? [notClosed(openQuote)] : []
   const versions: VersionInfo[] = []
   rows.forEach((r, i) => {
     if (i === 0 && /version/i.test(r[0] ?? '')) return
     const [v, d, ...notes] = r
     const date = toDate(d)
-    if (!v || !date) { issues.push({ line: i + 1, level: 'error', message: `Expected "version,date", got "${r.join(',')}".` }); return }
+    if (!v || !date) { issues.push({ line: lines[i], level: 'error', message: `Expected "version,date", got "${r.join(',')}".` }); return }
     versions.push({ version: cleanVersion(v), date: date.slice(0, 10), notes: notes.join(', ') || undefined, origin: 'listed' })
   })
   return { versions, issues }

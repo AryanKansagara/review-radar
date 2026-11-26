@@ -6,3 +6,8 @@ dist
 .env.local
 .env*
 qa-check.mjs
+
+# Playwright
+/test-results
+/playwright-report
+/blob-report
