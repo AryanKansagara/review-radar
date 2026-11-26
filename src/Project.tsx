@@ -3,7 +3,7 @@ import { countryName } from './engine/reviews.ts'
 import { BASELINE_N, displaySeries, MIN_N } from './engine/stats.ts'
 import type { AppInfo } from './engine/types.ts'
 import { CountryHeat, Dist, ThemeBubbles, Timeline } from './Charts.tsx'
-import { analyze, bumpData, getReviews, makeSnapshot, useAnalysis, useReviews, type Analysis } from './projectData.ts'
+import { analyze, bumpData, getReviews, importedApp, IMPORTED, isStoreApp, makeSnapshot, useAnalysis, useReviews, type Analysis } from './projectData.ts'
 import { getProject, putData, saveProject, update, useProjects, type Project } from './store.ts'
 import { deleteSnapshotCloud } from './sync.ts'
 import { Empty, fmtDate, fmtPct, go, Link, NotFound, signed, Stars, SyntheticBadge, toast } from './ui.tsx'
@@ -22,6 +22,9 @@ export default function ProjectView({ id, tab }: { id: string; tab: string }) {
   const [countries, setCountries] = useState<string[]>([])
   const a = useAnalysis(p, reviews, undefined, countries)
   useEffect(() => { if (p) document.title = `${p.name} · Review Radar` }, [p?.name])
+  // Adding a competitor to imported reviews used to make the competitor the project's own app and hide them.
+  const lost = !!p?.apps.length && p.apps.every(isStoreApp) && !!reviews?.some(r => r.appId === IMPORTED)
+  useEffect(() => { if (p && lost) void update(p, { apps: [importedApp(p), ...p.apps] }) }, [p?.id, lost])
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || (e.target as HTMLElement).closest('input,textarea,select,[contenteditable]')) return
@@ -35,8 +38,8 @@ export default function ProjectView({ id, tab }: { id: string; tab: string }) {
   if (list === null) return <div className="boot" role="status"><span className="spinner" /> Loading</div>
   if (!p) return <NotFound />
   if (tab === 'report') return null
-  const app = p.apps[0]
-  const usedCountries = reviews ? [...new Set(reviews.filter(r => r.appId === app?.id).map(r => r.country))] : []
+  const app = p.apps.length && isStoreApp(p.apps[0]) ? p.apps[0] : undefined
+  const usedCountries = reviews ? [...new Set(reviews.filter(r => r.appId === p.apps[0]?.id).map(r => r.country))] : []
   const noData = reviews !== null && !reviews.length
 
   return (
@@ -190,7 +193,7 @@ function Compare({ p }: { p: Project }) {
       </div>
       {adding && <div className="card pad"><AppPicker onPick={async a => {
         if (p.apps.some(x => x.id === a.id)) { toast(`${a.name} is already in this project.`); return }
-        await update(p, { apps: [...p.apps, a] })
+        await update(p, { apps: [...(p.apps.length ? p.apps : [importedApp(p)]), a] })
         setAdding(false)
         toast(`Added ${a.name}. Fetch to pull its reviews.`, { action: { label: 'Fetch now', run: () => go(`/app/p/${p.id}/data?fetch=1`) } })
       }} autoFocus /></div>}
@@ -209,7 +212,7 @@ function CompareTable({ p, apps }: { p: Project; apps: AppInfo[] }) {
     <div className="card pad">
       <div className="table-wrap">
         <table className="data compare">
-          <thead><tr><th scope="col">Theme share of reviews</th>{rows.map(({ app }, i) => <th key={app.id} scope="col" className="num">{app.name}{i === 0 && <small className="block muted">yours</small>}</th>)}</tr></thead>
+          <thead><tr><th scope="col">Theme share of reviews</th>{rows.map(({ app }, i) => <th key={app.id} scope="col" className="num">{isStoreApp(app) ? app.name : p.name}{i === 0 && <small className="block muted">yours</small>}</th>)}</tr></thead>
           <tbody>
             <tr><th scope="row">Average rating</th>{rows.map(({ app, a }) => <td key={app.id} className="num"><b>{a?.summary.n ? a.summary.mean.toFixed(2) : 'n/a'}</b></td>)}</tr>
             <tr><th scope="row">Reviews analysed</th>{rows.map(({ app, a }) => <td key={app.id} className="num">{a?.summary.n ?? 0}</td>)}</tr>

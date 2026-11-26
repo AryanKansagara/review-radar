@@ -3,7 +3,7 @@ import { assignVersions, detectMapping, FIELDS, jsonToRows, parseAscJson, parseC
 import { COUNTRIES, mergeReviews } from './engine/reviews.ts'
 import type { VersionInfo } from './engine/types.ts'
 import { OUTAGE_NOTE, type FetchProgress } from './live.ts'
-import { bumpData, getReviews, makeSnapshot, mergeVersions, runFetch } from './projectData.ts'
+import { bumpData, getReviews, isStoreApp, makeSnapshot, mergeVersions, runFetch } from './projectData.ts'
 import { getDefaults, getProject, putData, saveProject, update, uuid, type Project } from './store.ts'
 import { RAW_SYNC_LIMIT } from './sync.ts'
 import { fmtDate, Link, plural, toast } from './ui.tsx'
@@ -15,9 +15,9 @@ export default function Data({ p }: { p: Project }) {
   const q = new URLSearchParams(location.search)
   return (
     <div className="stack-lg">
-      {p.apps[0] && !p.sampleId && <FetchPanel p={p} auto={q.get('fetch') === '1'} />}
+      {p.apps.some(isStoreApp) && !p.sampleId && <FetchPanel p={p} auto={q.get('fetch') === '1'} />}
       {p.sampleId && <div className="banner">This is a synthetic sample, rebuilt from a fixed seed on every device. <Link href="/app">Start a project for your own app</Link> to fetch live reviews.</div>}
-      {!p.sampleId && <ImportPanel p={p} startOpen={q.get('import') === '1' || !p.apps.length} />}
+      {!p.sampleId && <ImportPanel p={p} startOpen={q.get('import') === '1' || !p.apps.length || !isStoreApp(p.apps[0])} />}
       {!p.sampleId && <VersionsPanel p={p} />}
       <div className="card pad stack-sm">
         <h2 className="h4">Stored data</h2>
@@ -70,7 +70,7 @@ function FetchPanel({ p, auto }: { p: Project; auto: boolean }) {
         <h2 className="h4">Fetch from the App Store</h2>
         {p.lastFetch && <span className="muted small">Last fetched {new Date(p.lastFetch).toLocaleString()}</span>}
       </div>
-      <p className="muted small">Pulls the most recent public reviews (Apple’s feed returns up to 500 per country, newest first) for {p.apps.map(a => a.name).join(', ')}. New reviews are merged by id; nothing is ever duplicated. Up to {getDefaults().pages} pages per country (Settings).</p>
+      <p className="muted small">Pulls the most recent public reviews (Apple’s feed returns up to 500 per country, newest first) for {p.apps.filter(isStoreApp).map(a => a.name).join(', ')}. New reviews are merged by id; nothing is ever duplicated. Up to {getDefaults().pages} pages per country (Settings).</p>
       <fieldset className="countries" disabled={busy}>
         <legend className="small muted">Countries</legend>
         {COUNTRIES.map(([c, n]) => <label key={c} className="chip-check"><input type="checkbox" checked={p.countries.includes(c)} onChange={() => toggle(c)} /> {n}</label>)}

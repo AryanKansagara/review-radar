@@ -76,14 +76,15 @@ export async function runFetch(id: string, onProgress?: (label: string, p: Fetch
   const failed: string[] = []
   const empty: string[] = []
   const fetched = new Map<string, { app: AppInfo; reviews: Review[] }>()
-  for (const [i, a] of start.apps.entries()) {
+  for (const a of start.apps.filter(isStoreApp)) {
+    const own = a.id === start.apps[0].id
     const fresh = await lookupApp(a.id, start.countries[0], signal).catch(() => null)
     const app = fresh ?? a
     // Competitors get fewer pages to keep the fetch quick.
-    const res = await fetchReviews(app.id, start.countries, i === 0 ? pages : Math.min(pages, 4), pr => onProgress?.(app.name, pr), signal)
+    const res = await fetchReviews(app.id, start.countries, own ? pages : Math.min(pages, 4), pr => onProgress?.(app.name, pr), signal)
     failed.push(...res.failed.map(c => `${app.name} (${c.toUpperCase()})`))
-    if (looksLikeOutage(res, start.countries, app.ratingCount)) { if (i === 0) outage = true }
-    else if (i === 0) empty.push(...res.empty)
+    if (looksLikeOutage(res, start.countries, app.ratingCount)) { if (own) outage = true }
+    else if (own) empty.push(...res.empty)
     fetched.set(a.id, { app, reviews: res.reviews })
   }
   const gone = { added: 0, updated: 0, total: 0, failed, empty, outage, deleted: true }
@@ -133,7 +134,9 @@ export interface Filters { countries: string[] }
 export function analyze(p: Project | undefined, reviews: Review[] | null, appId?: string, countries?: string[]) {
   {
     if (!p || !reviews) return null
-    const app = p.apps.find(a => a.id === appId) ?? p.apps[0] ?? importedApp(p)
+    const found = p.apps.find(a => a.id === appId) ?? p.apps[0]
+    // Rebuilt rather than read, so it follows the project's name.
+    const app = found && isStoreApp(found) ? found : importedApp(p)
     const appReviews = reviews.filter(r => r.appId === app.id)
     const rs = countries?.length ? appReviews.filter(r => countries.includes(r.country)) : appReviews
     const versions = buildVersions(appReviews, p.versions[app.id] ?? [])
@@ -155,8 +158,10 @@ export function analyze(p: Project | undefined, reviews: Review[] | null, appId?
     }
   }
 }
-/** Import-only projects have no App Store app; their reviews are stored under the id 'imported'. */
-const importedApp = (p: Project): AppInfo => ({ id: 'imported', name: p.name, developer: 'Imported reviews', icon: '', genre: '', version: '', releaseNotes: '', currentVersionReleaseDate: '', rating: null, ratingCount: null, currentVersionRating: null, currentVersionRatingCount: null, url: '' })
+/** Import-only projects have no App Store app; their reviews are stored under the id 'imported'. With competitors, this stands in as the first app. */
+export const IMPORTED = 'imported'
+export const isStoreApp = (a: AppInfo) => a.id !== IMPORTED
+export const importedApp = (p: Project): AppInfo => ({ id: IMPORTED, name: p.name, developer: 'Imported reviews', icon: '', genre: '', version: '', releaseNotes: '', currentVersionReleaseDate: '', rating: null, ratingCount: null, currentVersionRating: null, currentVersionRatingCount: null, url: '' })
 
 export type Analysis = NonNullable<ReturnType<typeof analyze>>
 
