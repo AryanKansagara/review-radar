@@ -1,5 +1,6 @@
 // Theme extraction without paid APIs: a curated, user-editable taxonomy plus TF-IDF term clusters.
 import { cmpVersion } from './reviews.ts'
+import { MIN_N } from './stats.ts'
 import type { Review, ThemeRule } from './types.ts'
 
 export const DEFAULT_RULES: ThemeRule[] = [
@@ -100,12 +101,12 @@ export interface Emerging { id: string; label: string; latest: number; before: n
 
 /**
  * Themes whose share in the latest version is well above their share across earlier versions.
- * Requires at least 3 mentions and a 1.5x lift (or new from zero).
+ * Requires at least 3 mentions and a 1.5x lift (or new from zero), and enough earlier reviews (MIN_N) to have a share to compare with.
  */
 export function emergingThemes(reviews: Review[], rules: ThemeRule[], latest: string): Emerging[] {
   const now = reviews.filter(r => r.version === latest)
   const prev = reviews.filter(r => r.version !== latest && cmpVersion(r.version, latest) < 0)
-  if (!now.length) return []
+  if (!now.length || prev.length < MIN_N) return []
   const share = (rs: Review[], id: string) => rs.length ? rs.filter(r => classify(r, rules).includes(id)).length / rs.length : 0
   return rules.filter(x => x.enabled).map(rule => {
     const n = now.filter(r => classify(r, rules).includes(rule.id)).length
